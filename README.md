@@ -1,26 +1,7 @@
 # Pharmacy Workstation Simulator
 
-A POV-style pharmacy simulator focused on data entry and prescription verification.
+A browser-based POV pharmacy simulator for practicing prescription data entry and verification.
 
-This version is built around the drop-off and pharmacist verification workflow. It does not include filling, counting, stock pulling, or bagging. The goal is to practice reading a hard copy, entering the prescription correctly, and catching mismatches before approval.
+Open `index.html` in a browser to work from a pharmacy counter view. The page shows the bench, medication shelves, bottles, ID and insurance cards, a scanner, label printer, and a visual check tray while the gameplay focuses on keying prescriptions and catching verification mismatches.
 
-## What's Inside
-
-- Data Entry mode: key patient, prescriber, medication, directions, quantity, days supply, refills, and DAW.
-- Sig help: quick reference for common abbreviations like PO, QD, BID, QAM, QHS, and PRN.
-- Verification mode: compare the original prescription to an entered profile and mark incorrect fields.
-- Scoring and feedback: learn which field was wrong and why it matters.
-- POV workstation layout: hard copy on the counter, pharmacy system monitor, keyboard, and drop-off window.
-
-## Run Locally
-
-Open `index.html` in a browser, or run:
-
-```bash
-npm install
-npm run dev
-```
-
-## Training Note
-
-This is a practice game for learning workflow concepts. It is not medical, legal, or pharmacy practice guidance.
+This version intentionally does not include filling, counting, or bagging workflows.
