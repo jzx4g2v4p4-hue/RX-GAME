@@ -25,7 +25,8 @@
     <script>
       (async function bootRxReady() {
         try {
-          const response = await fetch('./src/RxReady.jsx', { cache: 'no-cache' });
+          const sourceUrl = 'https://raw.githubusercontent.com/jzx4g2v4p4-hue/RX-GAME/main/src/RxReady.jsx?cache=' + Date.now();
+          const response = await fetch(sourceUrl, { cache: 'no-cache' });
           if (!response.ok) throw new Error('Could not load RxReady.jsx');
           let source = await response.text();
           source = source.replace(/import React, \{ useState, useEffect, useRef \} from "react";\s*/, 'const { useState, useEffect, useRef } = React;\n');
