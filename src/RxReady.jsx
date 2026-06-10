@@ -131,7 +131,7 @@ const MODES = [
     id: 13,
     title: "ManagerShift",
     tag: "Queue Control",
-    desc: "Run the bench from a dashboard: verify data, watch production timers, and clear final check with vial visuals.",
+    desc: "Run the bench from a dashboard: verify data, watch production timers, handle drive-thru escalations, and finish with a CII safe audit.",
     icon: "M",
   },
 ];
@@ -3451,6 +3451,8 @@ function FillCheck({ level, onFinish, onQuit }) {
 }
 
 function managerRxFromFillCase(c, i) {
+  const lanes = ["Drive-thru", "Counter", "Waiter", "Phone"];
+  const patienceMs = 32000 + ((i * 11000) % 26000);
   return {
     id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
     patient: c.rx.patient,
@@ -3458,8 +3460,274 @@ function managerRxFromFillCase(c, i) {
     strength: c.rx.strength,
     qty: c.rx.qty,
     sig: c.rx.sig,
+    lane: lanes[i % lanes.length],
+    patienceMs,
+    patienceStartedAt: Date.now(),
+    deEscalated: false,
     fillCase: c,
   };
+}
+
+function useDriveThruBell(enabled) {
+  const timerRef = useRef(null);
+  const visualRef = useRef(null);
+  const audioRef = useRef(null);
+  const enabledRef = useRef(enabled);
+  const [bellActive, setBellActive] = useState(false);
+  const [bellCount, setBellCount] = useState(0);
+
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+
+  function getAudio() {
+    if (typeof window === "undefined") return null;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+    if (!audioRef.current) {
+      const ctx = new AudioContext();
+      const master = ctx.createGain();
+      master.gain.value = 1;
+      master.connect(ctx.destination);
+      audioRef.current = { ctx, master };
+    }
+    return audioRef.current;
+  }
+
+  function playTone(audio, start, freq, length, loudness) {
+    const osc = audio.ctx.createOscillator();
+    const gain = audio.ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(freq, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(loudness, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    osc.connect(gain);
+    gain.connect(audio.master);
+    osc.start(start);
+    osc.stop(start + length + 0.03);
+  }
+
+  function ring(pattern = "drive-thru") {
+    if (!enabledRef.current && pattern !== "meltdown") return;
+    setBellActive(true);
+    setBellCount((n) => n + 1);
+    window.clearTimeout(visualRef.current);
+    visualRef.current = window.setTimeout(() => setBellActive(false), pattern === "meltdown" ? 6200 : 3200);
+
+    const audio = getAudio();
+    if (!audio) return;
+    if (audio.ctx.state === "suspended") audio.ctx.resume().catch(() => {});
+    const t = audio.ctx.currentTime + 0.02;
+    audio.master.gain.cancelScheduledValues(t);
+    audio.master.gain.setValueAtTime(1, t);
+    const hits = pattern === "meltdown"
+      ? [0, 0.13, 0.26, 0.52, 0.65, 0.78, 1.06, 1.19, 1.32]
+      : [0, 0.18, 0.36, 0.82, 1.0];
+    hits.forEach((offset, i) => {
+      const freq = pattern === "meltdown" ? (i % 2 ? 880 : 1240) : (i % 2 ? 740 : 980);
+      playTone(audio, t + offset, freq, pattern === "meltdown" ? 0.11 : 0.14, pattern === "meltdown" ? 0.24 : 0.16);
+    });
+  }
+
+  function silence() {
+    window.clearTimeout(timerRef.current);
+    window.clearTimeout(visualRef.current);
+    setBellActive(false);
+    const audio = audioRef.current;
+    if (audio) {
+      const t = audio.ctx.currentTime;
+      audio.master.gain.cancelScheduledValues(t);
+      audio.master.gain.setTargetAtTime(0.0001, t, 0.015);
+    }
+  }
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let alive = true;
+    const schedule = () => {
+      const wait = 45000 + Math.floor(Math.random() * 45001);
+      timerRef.current = window.setTimeout(() => {
+        if (!alive) return;
+        ring("drive-thru");
+        schedule();
+      }, wait);
+    };
+    schedule();
+    return () => {
+      alive = false;
+      window.clearTimeout(timerRef.current);
+    };
+  }, [enabled]);
+
+  useEffect(() => () => silence(), []);
+
+  return { bellActive, bellCount, ring, silence };
+}
+
+const SAFE_AUDIT_BOTTLES = [
+  {
+    drug: "Oxycodone IR",
+    strength: "5 mg",
+    ndc: "00406-0512",
+    expected: 120,
+    actual: 118,
+    pill: { color: "#ffffff", shape: "round", imprint: "K 18" },
+  },
+  {
+    drug: "Amphetamine salts",
+    strength: "20 mg",
+    ndc: "0555-0768",
+    expected: 90,
+    actual: 90,
+    pill: { color: "#f4a8a8", shape: "round", imprint: "AD 20" },
+  },
+  {
+    drug: "Methylphenidate ER",
+    strength: "36 mg",
+    ndc: "50458-0586",
+    expected: 60,
+    actual: 61,
+    pill: { color: "#b8d8f2", shape: "capsule", imprint: "ALZA 36" },
+  },
+  {
+    drug: "Hydromorphone",
+    strength: "2 mg",
+    ndc: "00406-3243",
+    expected: 100,
+    actual: 97,
+    pill: { color: "#f5f1df", shape: "round", imprint: "M 2" },
+  },
+];
+
+function SafeAudit({ onBalanced, summary }) {
+  const [entries, setEntries] = useState(() => SAFE_AUDIT_BOTTLES.map(() => ""));
+  const [attempts, setAttempts] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+
+  function parseVariance(value) {
+    const trimmed = value.trim();
+    if (!/^[+-]?\d+$/.test(trimmed)) return null;
+    return Number(trimmed);
+  }
+
+  const variances = SAFE_AUDIT_BOTTLES.map((b) => b.actual - b.expected);
+  const exact = entries.map((value, i) => parseVariance(value) === variances[i]);
+  const balanced = exact.every(Boolean);
+
+  function setEntry(i, value) {
+    setEntries((list) => list.map((item, idx) => (idx === i ? value : item)));
+  }
+
+  function submitAudit() {
+    const nextAttempts = attempts + 1;
+    setAttempts(nextAttempts);
+    setSubmitted(true);
+    if (balanced) onBalanced({ attempts: nextAttempts, varianceTotal: variances.reduce((sum, v) => sum + Math.abs(v), 0) });
+  }
+
+  function PhysicalCount({ bottle }) {
+    const tens = Math.floor(bottle.actual / 10);
+    const singles = bottle.actual % 10;
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center", marginTop: 10 }}>
+        {Array.from({ length: tens }).map((_, group) => (
+          <div key={`g-${group}`} title="10-count group" style={{
+            width: 30, height: 22, borderRadius: 5, border: "1px solid rgba(255,255,255,0.18)",
+            background: "rgba(0,0,0,0.16)", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 1.5, padding: 3,
+          }}>
+            {Array.from({ length: 10 }).map((__, dot) => (
+              <span key={dot} style={{ width: 3.5, height: 3.5, borderRadius: "50%", background: bottle.pill.color, boxShadow: "0 1px 2px rgba(0,0,0,0.35)" }} />
+            ))}
+          </div>
+        ))}
+        {Array.from({ length: singles }).map((_, i) => (
+          <Pill key={`s-${i}`} p={bottle.pill} size={14} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rise">
+      <div style={{
+        borderRadius: 18, padding: 18, color: "#f5f1df",
+        background: "linear-gradient(145deg, #2d3330, #111816 58%, #343b38)",
+        border: "3px solid rgba(255,255,255,0.18)",
+        boxShadow: "inset 0 0 0 2px rgba(0,0,0,0.42), 0 22px 46px -24px rgba(0,0,0,0.65)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14 }}>
+          <div>
+            <div className="pixel" style={{ fontSize: 10, color: C.amberSoft, marginBottom: 8 }}>CII SAFE AUDIT</div>
+            <div className="display" style={{ fontSize: 29, fontWeight: 900, lineHeight: 1 }}>Daily Finisher</div>
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: "#d7c9a9", textAlign: "right" }}>
+            Cleared {summary?.completed || 0}<br />Accuracy {summary?.completed ? Math.round((summary.correct / summary.completed) * 100) : 0}%
+          </div>
+        </div>
+
+        <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.22)", padding: 12, marginBottom: 14 }}>
+          <div className="mono" style={{ fontSize: 10, color: C.amberSoft, marginBottom: 6 }}>VAULT DOOR</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 7 }}>
+            {Array.from({ length: 24 }).map((_, i) => (
+              <span key={i} style={{ height: 9, borderRadius: 20, background: i % 3 === 0 ? "#d8c28e" : "#6f7772", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.45)" }} />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          {SAFE_AUDIT_BOTTLES.map((bottle, i) => {
+            const wrong = submitted && !exact[i];
+            return (
+              <div key={bottle.drug} style={{
+                borderRadius: 12, border: `1.5px solid ${wrong ? "#ff563f" : "rgba(255,255,255,0.18)"}`,
+                background: wrong ? "rgba(178,58,36,0.18)" : "rgba(255,255,255,0.06)", padding: 12,
+              }}>
+                <div style={{ display: "grid", gridTemplateColumns: "52px 1fr auto", gap: 12, alignItems: "center" }}>
+                  <div style={{ width: 46, height: 60, borderRadius: "7px 7px 9px 9px", background: "#a96019", position: "relative", boxShadow: "inset 0 -10px 18px rgba(0,0,0,0.22)" }}>
+                    <div style={{ position: "absolute", top: -7, left: 12, width: 22, height: 8, borderRadius: "3px 3px 1px 1px", background: "#6f4214" }} />
+                    <div style={{ position: "absolute", left: 6, right: 6, bottom: 8, minHeight: 25, borderRadius: 3, background: "#f6efe0", color: "#26332d", fontSize: 7.5, fontWeight: 800, display: "grid", placeItems: "center", textAlign: "center", padding: 2 }}>
+                      CII
+                    </div>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 900, fontSize: 14.5 }}>{bottle.drug} {bottle.strength}</div>
+                    <div className="mono" style={{ color: "#d7c9a9", fontSize: 10.5, marginTop: 3 }}>NDC {bottle.ndc}</div>
+                    <PhysicalCount bottle={bottle} />
+                  </div>
+                  <div style={{ minWidth: 95, textAlign: "right" }}>
+                    <div className="mono" style={{ color: C.amberSoft, fontSize: 9, marginBottom: 4 }}>EXPECTED</div>
+                    <div className="pixel" style={{ fontSize: 18, color: "#78f0a1", background: "#06130c", borderRadius: 6, padding: "8px 7px", boxShadow: "inset 0 0 8px rgba(120,240,161,0.18)" }}>{bottle.expected}</div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", marginTop: 11 }}>
+                  <label className="mono" style={{ color: "#d7c9a9", fontSize: 10.5 }}>Variance input: physical minus expected</label>
+                  <input
+                    value={entries[i]}
+                    onChange={(e) => setEntry(i, e.target.value)}
+                    inputMode="numeric"
+                    placeholder="+0"
+                    style={{
+                      width: 86, padding: "9px 10px", borderRadius: 8, border: `1px solid ${wrong ? "#ff563f" : "rgba(255,255,255,0.22)"}`,
+                      background: "#07100c", color: "#f5f1df", fontFamily: "'Spline Sans Mono', monospace", fontSize: 14, textAlign: "center",
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {submitted && !balanced && (
+          <div className="pop" style={{ marginTop: 13, padding: 12, borderRadius: 10, background: "rgba(178,58,36,0.22)", border: "1px solid #ff563f", fontWeight: 800 }}>
+            Audit variance still off. The safe stays open until every discrepancy balances.
+          </div>
+        )}
+
+        <button onClick={submitAudit} style={btn(balanced ? C.green : C.amber, "#fff", { width: "100%", marginTop: 14, background: balanced ? C.green : C.amber })}>
+          {balanced ? "Balance safe and close shift" : "Run safe audit"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* ---------- Mode 13: ManagerShift ---------- */
@@ -3470,18 +3738,103 @@ function ManagerShift({ level, onFinish, onQuit }) {
   const [completed, setCompleted] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [meltdown, setMeltdown] = useState(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [pendingSummary, setPendingSummary] = useState(null);
   const timers = useRef({});
+  const pendingSummaryRef = useRef(null);
+  const bellPenaltyRef = useRef(0);
+  const bell = useDriveThruBell(!auditOpen);
 
   useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
   useEffect(() => {
-    if (!inProduction.length) return undefined;
     const tick = setInterval(() => setNow(Date.now()), 350);
     return () => clearInterval(tick);
-  }, [inProduction.length]);
+  }, []);
 
   const total = completed + toVerifyData.length + inProduction.length + finalCheck.length;
+  const livePatients = [...toVerifyData, ...inProduction, ...finalCheck];
+
+  function patientLeftMs(rx) {
+    return Math.max(0, rx.patienceMs - (now - rx.patienceStartedAt));
+  }
+
+  function clearProductionTimers() {
+    Object.values(timers.current).forEach(clearTimeout);
+    timers.current = {};
+  }
+
+  function buildManagerSummary(done = completed, right = correct) {
+    return {
+      mode: 13,
+      completed: done,
+      correct: right,
+      total: Math.max(done, total),
+      rating: done ? Math.round((right / done) * 100) : 0,
+    };
+  }
+
+  function startSafeAudit(done = completed, right = correct) {
+    const summary = buildManagerSummary(done, right);
+    clearProductionTimers();
+    pendingSummaryRef.current = summary;
+    setPendingSummary(summary);
+    setMeltdown(null);
+    bell.silence();
+    setAuditOpen(true);
+  }
+
+  function finishAfterAudit(audit) {
+    const base = pendingSummaryRef.current || buildManagerSummary();
+    onFinish({ ...base, auditBalanced: true, auditAttempts: audit.attempts, auditVarianceTotal: audit.varianceTotal });
+  }
+
+  function resetPressureQueue(queue) {
+    const stamp = Date.now();
+    return queue.map((rx) => ({
+      ...rx,
+      patienceStartedAt: stamp,
+      patienceMs: Math.max(rx.patienceMs + 18000, 62000),
+      deEscalated: true,
+    }));
+  }
+
+  function wtfButton() {
+    bell.silence();
+    setMeltdown(null);
+    setNow(Date.now());
+    setToVerifyData((q) => resetPressureQueue(q));
+    setInProduction((q) => resetPressureQueue(q));
+    setFinalCheck((q) => resetPressureQueue(q));
+  }
+
+  useEffect(() => {
+    if (auditOpen || meltdown) return;
+    const angry = livePatients.find((rx) => patientLeftMs(rx) <= 0);
+    if (!angry) return;
+    setMeltdown({
+      patient: angry.patient,
+      drug: `${angry.drug} ${angry.strength}`,
+      lane: angry.lane,
+      at: Date.now(),
+    });
+    bell.ring("meltdown");
+  }, [now, toVerifyData, inProduction, finalCheck, auditOpen, meltdown]);
+
+  useEffect(() => {
+    if (auditOpen || bell.bellCount <= bellPenaltyRef.current) return;
+    bellPenaltyRef.current = bell.bellCount;
+    const squeeze = (queue) => queue.map((rx) => ({
+      ...rx,
+      patienceMs: Math.max(10000, rx.patienceMs - 3500),
+    }));
+    setToVerifyData((q) => squeeze(q));
+    setInProduction((q) => squeeze(q));
+    setFinalCheck((q) => squeeze(q));
+  }, [bell.bellCount, auditOpen]);
 
   function approveData(rx) {
+    if (meltdown || auditOpen) return;
     const etaMs = 5000 + Math.floor(Math.random() * 7001);
     const ticket = { ...rx, etaMs, startedAt: Date.now(), readyAt: Date.now() + etaMs };
     setToVerifyData((q) => q.filter((item) => item.id !== rx.id));
@@ -3493,13 +3846,8 @@ function ManagerShift({ level, onFinish, onQuit }) {
     }, etaMs);
   }
 
-  function finishManagerShift(done = completed, right = correct) {
-    Object.values(timers.current).forEach(clearTimeout);
-    timers.current = {};
-    onFinish({ mode: 13, completed: done, correct: right, total: Math.max(done, total), rating: done ? Math.round((right / done) * 100) : 0 });
-  }
-
   function finalAction(rx, action) {
+    if (meltdown || auditOpen) return;
     const shouldApprove = rx.fillCase.errorField === null;
     const ok = action === "approve" ? shouldApprove : !shouldApprove;
     const nextCompleted = completed + 1;
@@ -3508,8 +3856,26 @@ function ManagerShift({ level, onFinish, onQuit }) {
     setFinalCheck((q) => q.filter((item) => item.id !== rx.id));
     setCompleted(nextCompleted);
     if (ok) setCorrect(nextCorrect);
-    if (remaining <= 0) finishManagerShift(nextCompleted, nextCorrect);
+    if (remaining <= 0) startSafeAudit(nextCompleted, nextCorrect);
   }
+
+  const PressureMeter = ({ rx }) => {
+    const left = patientLeftMs(rx);
+    const pct = Math.max(0, Math.min(100, (left / rx.patienceMs) * 100));
+    const hot = pct <= 28;
+    const color = pct <= 20 ? C.clay : pct <= 45 ? C.amber : C.green;
+    return (
+      <div style={{ marginTop: 9 }}>
+        <div className="mono" style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9.5, color: hot ? C.clay : C.muted }}>
+          <span>{rx.lane}{rx.deEscalated ? " / recovered" : ""}</span>
+          <span>{left > 0 ? `${Math.ceil(left / 1000)}s patience` : "ZERO"}</span>
+        </div>
+        <div style={{ height: 6, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 5 }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .25s linear" }} />
+        </div>
+      </div>
+    );
+  };
 
   const Column = ({ title, count, children }) => (
     <div style={{ minWidth: 0 }}>
@@ -3525,22 +3891,56 @@ function ManagerShift({ level, onFinish, onQuit }) {
     <div style={{ padding: 14, borderRadius: 12, border: `1px dashed ${C.line}`, color: C.muted, fontSize: 13.5, textAlign: "center" }}>{text}</div>
   );
 
+  if (auditOpen) return <SafeAudit onBalanced={finishAfterAudit} summary={pendingSummary} />;
+
+  const hottest = livePatients.reduce((winner, rx) => {
+    if (!winner) return rx;
+    return patientLeftMs(rx) < patientLeftMs(winner) ? rx : winner;
+  }, null);
+
   return (
     <div className="rise">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 16 }}>
           <Stat label="Cleared" value={completed} color={C.pine} />
           <Stat label="Accuracy" value={completed ? `${Math.round((correct / completed) * 100)}%` : "-"} color={C.amber} />
         </div>
-        <button onClick={() => finishManagerShift()} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 13px", fontSize: 13 })}>
-          End shift
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button onClick={wtfButton} style={btn(C.clay, "#fff", { padding: "9px 13px", fontSize: 13, borderRadius: 10, background: C.clay })}>
+            WTF Button
+          </button>
+          <button onClick={() => startSafeAudit()} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 13px", fontSize: 13 })}>
+            End shift / audit
+          </button>
+        </div>
       </div>
       <ProgressBar value={(completed / Math.max(total, 1)) * 100} />
 
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 16px", lineHeight: 1.5 }}>
-        Manager dashboard: approve clean data entry, watch the simulated technician fill it, then clear final product verification.
+        Manager dashboard: approve clean data entry, watch production, clear final product verification, and keep the waiting room from boiling over.
       </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <div className={bell.bellActive ? "alarm-pulse" : ""} style={{
+          padding: 12, borderRadius: 12, border: `1px solid ${bell.bellActive ? C.clay : C.line}`,
+          background: bell.bellActive ? "rgba(178,58,36,0.12)" : C.card,
+        }}>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1, color: bell.bellActive ? C.clay : C.muted, textTransform: "uppercase" }}>
+            Drive-thru bell
+          </div>
+          <div className="display" style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+            {bell.bellActive ? "RINGING" : `${bell.bellCount} triggers`}
+          </div>
+        </div>
+        <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.line}`, background: C.card }}>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1, color: C.muted, textTransform: "uppercase" }}>
+            Hottest patient
+          </div>
+          <div className="display" style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+            {hottest ? `${Math.ceil(patientLeftMs(hottest) / 1000)}s` : "Clear"}
+          </div>
+        </div>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
         <Column title="To Verify Data" count={toVerifyData.length}>
@@ -3550,6 +3950,7 @@ function ManagerShift({ level, onFinish, onQuit }) {
               <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
               <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
               <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Qty {rx.qty} · {rx.sig}</div>
+              <PressureMeter rx={rx} />
               <button onClick={() => approveData(rx)}
                 style={btn(C.green, "#fff", { width: "100%", marginTop: 10, padding: "9px 12px", fontSize: 13, borderRadius: 10, background: C.green })}>
                 Approve data
@@ -3571,6 +3972,7 @@ function ManagerShift({ level, onFinish, onQuit }) {
                 <div style={{ height: 7, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 9 }}>
                   <div style={{ width: `${pct}%`, height: "100%", background: C.amber, transition: "width .25s linear" }} />
                 </div>
+                <PressureMeter rx={rx} />
               </div>
             );
           })}
@@ -3596,6 +3998,7 @@ function ManagerShift({ level, onFinish, onQuit }) {
                   Stock: {f.stockDrug} {f.stockStrength} · Count {f.count}
                 </div>
                 <div className="mono" style={{ color: needsReject ? C.amber : C.muted, fontSize: 10.5, marginTop: 7 }}>Review stock, count, vial pills, and label before clearing.</div>
+                <PressureMeter rx={rx} />
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button onClick={() => finalAction(rx, "reject")}
                     style={btn("transparent", C.clay, { border: `1px solid ${C.clay}`, flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10 })}>
@@ -3615,6 +4018,28 @@ function ManagerShift({ level, onFinish, onQuit }) {
       <button onClick={onQuit} style={btn("transparent", C.muted, { border: `1px solid ${C.line}`, width: "100%", marginTop: 14, fontSize: 13 })}>
         Quit to home
       </button>
+
+      {meltdown && (
+        <div className="alarm-pulse" style={{
+          position: "fixed", inset: 0, zIndex: 90, display: "grid", placeItems: "center", padding: 18,
+          background: "radial-gradient(circle at 50% 20%, rgba(255,77,48,0.98), rgba(128,0,0,0.96) 48%, rgba(38,0,0,0.98))",
+          color: "#fff", textAlign: "center",
+        }}>
+          <div style={{
+            width: "min(560px, 100%)", borderRadius: 14, padding: 22, border: "3px solid rgba(255,255,255,0.72)",
+            background: "rgba(30,0,0,0.58)", boxShadow: "0 24px 60px rgba(0,0,0,0.42)",
+          }}>
+            <div className="pixel" style={{ fontSize: 12, color: "#ffe1d8", marginBottom: 12 }}>PATIENT MELTDOWN</div>
+            <div className="display" style={{ fontSize: 40, fontWeight: 900, lineHeight: 1, marginBottom: 10 }}>SCREEN FROZEN</div>
+            <p style={{ margin: "0 auto 18px", maxWidth: 430, lineHeight: 1.45, fontSize: 15.5 }}>
+              {meltdown.patient} hit zero patience at {meltdown.lane} while waiting on {meltdown.drug}. Alarms stay live until the manager de-escalates.
+            </p>
+            <button onClick={wtfButton} style={btn("#fff", C.clay, { width: "100%", maxWidth: 330, fontSize: 17, fontWeight: 900 })}>
+              WTF Button
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3664,6 +4089,8 @@ export default function App() {
           background:radial-gradient(ellipse at center, transparent 58%, rgba(20,40,34,0.16)); }
         .blink { animation: blink 1.1s steps(2,start) infinite; }
         @keyframes blink { to { opacity:.3 } }
+        .alarm-pulse { animation: alarmPulse .46s steps(2,start) infinite; }
+        @keyframes alarmPulse { 50% { filter: brightness(1.28) saturate(1.2); transform: translateY(-1px); } }
       `}</style>
       <div className="crtv" /><div className="scan" />
 
@@ -4392,12 +4819,12 @@ function Result({ result, onAgain, onHome }) {
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
     color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
     line = pct >= 80
-      ? "Manager loop handled: data verified, production moved, final checks cleared."
+      ? "Manager loop handled: data verified, production moved, final checks cleared, and the CII safe balanced."
       : "Run the manager loop again and slow down at final check.";
     stats = [
       { label: "Final checks", value: result.completed },
       { label: "Correct calls", value: `${result.correct}/${result.completed}` },
-      { label: "Accuracy", value: pct + "%" },
+      { label: "Audit tries", value: result.auditAttempts || 1 },
     ];
   } else {
     const r = result.rating;
