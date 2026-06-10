@@ -127,6 +127,13 @@ const MODES = [
     desc: "Final product verification: the tech filled it — confirm they pulled the right stock, counted right, the pills in the vial match the reference, and the label's correct. Approve or reject.",
     icon: "⊙",
   },
+  {
+    id: 13,
+    title: "ManagerShift",
+    tag: "Queue Control",
+    desc: "Run the bench from a dashboard: verify data, watch production timers, and clear final check with vial visuals.",
+    icon: "M",
+  },
 ];
 
 /* ============================================================
@@ -2336,6 +2343,22 @@ const VBENCH = [
     orig: { drug: "albuterol HFA", strength: "90 mcg", disp: "1 inhaler", sig: "2 puffs po q4-6h prn SOB", refills: "2", dob: "5/19/83", date: "5/11/25", patient: "Derek Foss", dawChecked: false },
     errorField: "directions", note: "The sig is TWO puffs every 4–6 hours as needed, but the directions were entered as ONE puff every 4 hours. Mistranslated dose and interval.",
   },
+  {
+    level: 4, patient: "Marta Chen", dob: "02/09/1957", age: "68", sex: "F", patientAddr: "52 Rowan St, Dayton, OH",
+    prescriber: "Iris Tan, MD", prescriberAddr: "9 Summit Ave, Dayton, OH",
+    brand: "Biaxin", generic: "clarithromycin", strength: "500 mg", manufacturer: "AbbVie",
+    writtenDate: "6/10/2026", qty: "14", refills: "0", daysSupply: "7", dawCode: "0",
+    directions: "take one tablet by mouth twice daily for 7 days",
+    orig: { drug: "clarithromycin", strength: "500 mg", disp: "14", sig: "1 tab po BID x7d", refills: "0", dob: "2/9/57", date: "6/10/26", patient: "Marta Chen", dawChecked: false },
+    errorField: null,
+    durOverride: {
+      code: "M01",
+      title: "Severe DUR interaction",
+      profile: "Active profile: simvastatin 40 mg nightly.",
+      detail: "Clarithromycin is a strong CYP3A4 inhibitor and can sharply raise simvastatin exposure, increasing myopathy/rhabdomyolysis risk.",
+    },
+    note: "The data entry matches the hard copy, but the clinical DUR lock requires documented pharmacist intervention. M01 records the manager override after the interaction is addressed.",
+  },
 ];
 
 const VFIELD_LABELS = { patient: "Patient name", dob: "Date of birth", prescriber: "Prescriber", brand: "Brand", drug: "Generic", strength: "Strength", qty: "Quantity", refills: "Refills", daysSupply: "Days supply", daw: "DAW code", directions: "Directions" };
@@ -2350,9 +2373,13 @@ function VerifyBench({ level, onFinish, onQuit }) {
   const [streak, setStreak] = useState(0);
   const [best, setBest] = useState(0);
   const [correct, setCorrect] = useState(0);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideCode, setOverrideCode] = useState("");
+  const [overrideError, setOverrideError] = useState("");
 
   if (!cases.length) return <Empty onQuit={onQuit} />;
   const c = cases[idx];
+  const overrideRequired = !!c.durOverride;
   const hand = { fontFamily: "'Caveat', cursive", fontSize: 19, color: "#2a2a33", lineHeight: 1.1 };
 
   function choose(key) {
@@ -2370,7 +2397,17 @@ function VerifyBench({ level, onFinish, onQuit }) {
       onFinish({ mode: 1, score, correct, total: cases.length, bestStreak: best, outOfLives: false });
       return;
     }
-    setIdx(idx + 1); setPick(undefined); setLocked(false);
+    setIdx(idx + 1); setPick(undefined); setLocked(false); setOverrideOpen(false); setOverrideCode(""); setOverrideError("");
+  }
+  function submitOverride() {
+    if (!overrideRequired || locked) return;
+    if (overrideCode.trim().toUpperCase() !== c.durOverride.code) {
+      setOverrideError("Code rejected. Enter the documented intervention code to release the DUR lock.");
+      return;
+    }
+    setOverrideOpen(false);
+    setOverrideError("");
+    choose("__verify__");
   }
 
   // a tappable entry field
@@ -2418,6 +2455,15 @@ function VerifyBench({ level, onFinish, onQuit }) {
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 12px", lineHeight: 1.5 }}>
         Compare the entry to the original. <strong style={{ color: C.ink }}>Tap the field that doesn't match</strong> — or verify if it's clean.
       </p>
+
+      {overrideRequired && (
+        <div className="rx-card pop" style={{ padding: 15, marginBottom: 12, border: `2px solid ${C.clay}`, background: "rgba(178,58,36,0.08)" }}>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.clay, marginBottom: 6 }}>DUR Lock</div>
+          <div style={{ fontWeight: 900, fontSize: 15.5, color: C.ink }}>{c.durOverride.title}</div>
+          <div style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.45, marginTop: 4 }}>{c.durOverride.profile}</div>
+          <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.45, marginTop: 4 }}>{c.durOverride.detail}</div>
+        </div>
+      )}
 
       {/* entry cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -2484,11 +2530,24 @@ function VerifyBench({ level, onFinish, onQuit }) {
       </div>
 
       {/* verify button */}
-      {!locked && (
+      {!locked && !overrideRequired && (
         <button onClick={() => choose("__verify__")}
           style={btn(C.green, "#fff", { width: "100%", marginTop: 14, background: C.green })}>
           ✓ Everything matches — Verify &amp; fill
         </button>
+      )}
+
+      {!locked && overrideRequired && (
+        <>
+          <button disabled
+            style={btn(C.paper2, C.muted, { width: "100%", marginTop: 14, border: `1px solid ${C.line}`, cursor: "not-allowed" })}>
+            Standard approve disabled - DUR intervention required
+          </button>
+          <button onClick={() => { setOverrideOpen(true); setOverrideCode(""); setOverrideError(""); }}
+            style={btn(C.clay, "#fff", { width: "100%", marginTop: 10, background: C.clay })}>
+            Manager Override
+          </button>
+        </>
       )}
 
       {locked && (
@@ -2508,6 +2567,37 @@ function VerifyBench({ level, onFinish, onQuit }) {
             {idx + 1 >= cases.length ? "Finish set" : "Next prescription →"}
           </button>
         </>
+      )}
+
+      {overrideOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(20,28,24,0.58)", display: "grid", placeItems: "center", padding: 18 }}>
+          <div className="rx-card pop" style={{ width: "min(480px, 100%)", padding: 20, border: `2px solid ${C.clay}`, background: C.card }}>
+            <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.clay, marginBottom: 8 }}>Locked manager override</div>
+            <div className="display" style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>Clinical DUR Intervention</div>
+            <p style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.5, color: C.muted }}>
+              Standard approval is blocked. Document the intervention, then enter the release code to force this Rx through.
+            </p>
+            <div className="rx-card" style={{ padding: 12, background: "rgba(178,58,36,0.07)", marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>{c.durOverride.title}</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{c.durOverride.detail}</div>
+            </div>
+            <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>Intervention code</div>
+            <input value={overrideCode} onChange={(e) => { setOverrideCode(e.target.value.toUpperCase()); setOverrideError(""); }}
+              placeholder="Type M01"
+              style={{ padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${overrideError ? C.clay : C.line}`, width: "100%", fontSize: 18, fontFamily: "'Spline Sans Mono', monospace", color: C.ink, background: C.card, outline: "none" }} />
+            {overrideError && <div style={{ color: C.clay, fontSize: 12.5, marginTop: 6 }}>{overrideError}</div>}
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={() => setOverrideOpen(false)}
+                style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, flex: 1 })}>
+                Cancel
+              </button>
+              <button onClick={submitOverride}
+                style={btn(C.clay, "#fff", { flex: 1, background: C.clay })}>
+                Force through
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2644,10 +2734,84 @@ const INTAKE = [
   },
 ];
 
+function intakeQueueCase(c, i) {
+  return {
+    ...c,
+    id: c.id || `intake-${i}-${c.orig.patient}-${c.orig.drug}`,
+    waiter: i === 0 || c.level >= 3,
+    source: c.source || "bank",
+  };
+}
+
+function emptyManualRx() {
+  return {
+    patient: "",
+    dob: "",
+    drug: "",
+    strength: "",
+    sig: "",
+    qty: "",
+    days: "",
+    refills: "0",
+    daw: "0",
+    prescriber: "",
+    position: "1",
+    waiter: true,
+  };
+}
+
+function manualDirConcepts(sig) {
+  const synonyms = {
+    "1": ["1", "one"],
+    "2": ["2", "two"],
+    "3": ["3", "three"],
+    "4": ["4", "four"],
+    tablet: ["tablet", "tab"],
+    capsule: ["capsule", "cap"],
+    ml: ["ml", "milliliter"],
+  };
+  return normSig(sig).trim().split(/\s+/).filter(Boolean).map((word) => synonyms[word] || [word]);
+}
+
+function makeManualIntakeCase(form, serial) {
+  const today = new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+  const patient = form.patient.trim() || "Manual Waiter";
+  const dob = form.dob.trim() || "1/1/80";
+  const drug = form.drug.trim() || "custom medication";
+  const strength = form.strength.trim() || "custom strength";
+  const sig = form.sig.trim() || "1 tab po daily";
+  const qty = form.qty.trim() || "30";
+  const days = form.days.trim() || "30";
+  const refills = form.refills.trim() || "0";
+  const daw = form.daw || "0";
+  const prescriber = form.prescriber.trim() || "Manager Added, MD";
+  const qtyLower = qty.toLowerCase();
+
+  return {
+    id: `manual-${Date.now()}-${serial}`,
+    level: 1,
+    manual: true,
+    waiter: !!form.waiter,
+    source: "manual",
+    drug,
+    strength,
+    prescriber,
+    prescriberAddr: "Manual queue insert",
+    orig: { patient, dob, date: today, drug, strength, disp: qty, sig, refills, dawChecked: daw === "1" },
+    ans: { qtyAccept: Array.from(new Set([qtyLower, qtyLower.replace(/\s+/g, "")])), days, refills, daw },
+    dirConcepts: manualDirConcepts(sig),
+    dirModel: expandSig(sig) || sig,
+    note: `Manual queue Rx for ${patient}. Match the custom hard copy values you inserted, then send it to verification.`,
+  };
+}
+
 /* ---------- Mode 11: Data Entry ---------- */
 function IntakeBench({ level, onFinish, onQuit }) {
-  const [cases] = useState(() => shuffle(INTAKE.filter((c) => c.level <= level)).slice(0, 7));
-  const [idx, setIdx] = useState(0);
+  const [queue, setQueue] = useState(() => shuffle(INTAKE.filter((c) => c.level <= level)).slice(0, 7).map(intakeQueueCase));
+  const [completed, setCompleted] = useState(0);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [manual, setManual] = useState(() => emptyManualRx());
+  const [manualSerial, setManualSerial] = useState(1);
   const [dir, setDir] = useState("");
   const [qty, setQty] = useState("");
   const [days, setDays] = useState("");
@@ -2659,8 +2823,8 @@ function IntakeBench({ level, onFinish, onQuit }) {
   const [best, setBest] = useState(0);
   const [correct, setCorrect] = useState(0);
 
-  if (!cases.length) return <Empty onQuit={onQuit} />;
-  const c = cases[idx];
+  if (!queue.length) return <Empty onQuit={onQuit} />;
+  const c = queue[0];
   const expanded = expandSig(dir);
   const hand = { fontFamily: "'Caveat', cursive", color: "#2a2a33", lineHeight: 1.1 };
   const checks = locked ? {
@@ -2672,6 +2836,38 @@ function IntakeBench({ level, onFinish, onQuit }) {
   } : null;
   const allOK = checks && Object.values(checks).every(Boolean);
   const canSubmit = dir.trim() && qty.trim() && days.trim() && refl.trim() && daw != null;
+  const totalInPlay = completed + queue.length;
+  const manualReady = manual.drug.trim() && manual.sig.trim() && manual.qty.trim() && manual.days.trim();
+
+  function resetEntry() {
+    setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null); setLocked(false);
+  }
+
+  function moveQueueItem(from, to) {
+    if (locked || from == null || to == null || from === to || from < 0 || to < 0) return;
+    setQueue((q) => {
+      if (from >= q.length || to >= q.length) return q;
+      const next = [...q];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    resetEntry();
+  }
+
+  function insertManualRx() {
+    if (!manualReady || locked) return;
+    const rx = makeManualIntakeCase(manual, manualSerial);
+    const pos = Math.max(0, Math.min(queue.length, Number(manual.position || 1) - 1));
+    setQueue((q) => {
+      const next = [...q];
+      next.splice(pos, 0, rx);
+      return next;
+    });
+    setManualSerial((n) => n + 1);
+    setManual(emptyManualRx());
+    resetEntry();
+  }
 
   function submit() {
     if (locked || !canSubmit) return;
@@ -2682,11 +2878,17 @@ function IntakeBench({ level, onFinish, onQuit }) {
     else setStreak(0);
   }
   function next() {
-    if (idx + 1 >= cases.length) { onFinish({ mode: 1, score, correct, total: cases.length, bestStreak: best, outOfLives: false }); return; }
-    setIdx(idx + 1); setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null); setLocked(false);
+    const nextCompleted = completed + 1;
+    if (queue.length <= 1) {
+      onFinish({ mode: 1, score, correct, total: nextCompleted, bestStreak: best, outOfLives: false });
+      return;
+    }
+    setCompleted(nextCompleted);
+    setQueue((q) => q.slice(1));
+    resetEntry();
   }
 
-  const inp = (bad) => ({ padding: "10px 12px", borderRadius: 10, fontSize: 15, width: "100%",
+  const inp = (bad) => ({ padding: "10px 12px", borderRadius: 10, fontSize: 15, width: "100%", minWidth: 0,
     border: `1.5px solid ${locked ? (bad ? C.clay : C.green) : C.line}`, background: C.card, color: C.ink,
     fontFamily: "'Spline Sans', sans-serif", outline: "none" });
   const NumField = ({ label, val, set, bad, correctVal }) => (
@@ -2704,13 +2906,103 @@ function IntakeBench({ level, onFinish, onQuit }) {
           <Stat label="Score" value={score} color={C.pine} />
           <Stat label="Streak" value={`×${streak}`} color={C.amber} />
         </div>
-        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Rx {idx + 1} / {cases.length}</span>
+        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Done {completed} / {totalInPlay}</span>
       </div>
-      <ProgressBar value={(idx / cases.length) * 100} />
+      <ProgressBar value={(completed / Math.max(totalInPlay, 1)) * 100} />
 
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 12px", lineHeight: 1.5 }}>
         Read the hard copy and <strong style={{ color: C.ink }}>key the prescription in</strong> — type the sig (shorthand is fine), enter the quantity, work out the days supply, and set refills and DAW.
       </p>
+
+      <div className="rx-card" style={{ padding: 16, marginBottom: 14, background: "rgba(31,74,63,0.04)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 10 }}>
+          <div>
+            <div className="display" style={{ fontSize: 17, fontWeight: 900 }}>Manual Queue Triage</div>
+            <div className="mono" style={{ fontSize: 11, color: C.muted }}>Drag cards to reprioritize. Slot 1 is the active Rx.</div>
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: C.amber }}>{queue.length} waiting</span>
+        </div>
+
+        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          {queue.map((rx, i) => (
+            <div key={rx.id}
+              draggable={!locked}
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => { moveQueueItem(dragIndex, i); setDragIndex(null); }}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                padding: "10px 12px", borderRadius: 11,
+                border: `1.5px solid ${i === 0 ? C.amber : C.line}`,
+                background: i === 0 ? "rgba(192,120,30,0.12)" : C.card,
+                cursor: locked ? "default" : "grab",
+              }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span className="mono" style={{ fontSize: 10, color: i === 0 ? C.amber : C.muted }}>#{i + 1}</span>
+                  {rx.waiter && <span className="mono" style={{ fontSize: 9.5, color: C.paper, background: C.clay, borderRadius: 20, padding: "2px 7px" }}>WAITER</span>}
+                  {rx.manual && <span className="mono" style={{ fontSize: 9.5, color: C.paper, background: C.pine, borderRadius: 20, padding: "2px 7px" }}>CUSTOM</span>}
+                  <strong style={{ fontSize: 13.5 }}>{rx.orig.patient}</strong>
+                </div>
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {rx.orig.drug} {rx.orig.strength} · {rx.orig.sig}
+                </div>
+              </div>
+              {i > 0 && !locked && (
+                <button onClick={() => moveQueueItem(i, 0)}
+                  style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "7px 10px", fontSize: 12, borderRadius: 9 })}>
+                  Rush
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>Insert custom Rx</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr .7fr 1fr 1fr", gap: 8 }}>
+            <input value={manual.patient} onChange={(e) => setManual((m) => ({ ...m, patient: e.target.value }))} placeholder="Patient"
+              style={inp(false)} />
+            <input value={manual.dob} onChange={(e) => setManual((m) => ({ ...m, dob: e.target.value }))} placeholder="DOB"
+              style={inp(false)} />
+            <input value={manual.drug} onChange={(e) => setManual((m) => ({ ...m, drug: e.target.value }))} placeholder="Drug"
+              style={inp(false)} />
+            <input value={manual.strength} onChange={(e) => setManual((m) => ({ ...m, strength: e.target.value }))} placeholder="Strength"
+              style={inp(false)} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr .55fr .55fr .55fr .55fr", gap: 8, marginTop: 8 }}>
+            <input value={manual.sig} onChange={(e) => setManual((m) => ({ ...m, sig: e.target.value }))} placeholder="Sig, e.g. 1 tab po bid"
+              style={{ ...inp(false), fontFamily: "'Spline Sans Mono', monospace" }} />
+            <input value={manual.qty} onChange={(e) => setManual((m) => ({ ...m, qty: e.target.value }))} placeholder="Qty"
+              style={inp(false)} />
+            <input value={manual.days} onChange={(e) => setManual((m) => ({ ...m, days: e.target.value }))} placeholder="Days"
+              style={inp(false)} />
+            <input value={manual.refills} onChange={(e) => setManual((m) => ({ ...m, refills: e.target.value }))} placeholder="Refills"
+              style={inp(false)} />
+            <input type="number" min="1" max={queue.length + 1} value={manual.position}
+              onChange={(e) => setManual((m) => ({ ...m, position: e.target.value }))}
+              style={inp(false)} />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <select value={manual.daw} onChange={(e) => setManual((m) => ({ ...m, daw: e.target.value }))}
+              style={{ ...inp(false), flex: "0 0 150px" }}>
+              <option value="0">DAW 0</option>
+              <option value="1">DAW 1</option>
+              <option value="2">DAW 2</option>
+            </select>
+            <input value={manual.prescriber} onChange={(e) => setManual((m) => ({ ...m, prescriber: e.target.value }))} placeholder="Prescriber"
+              style={{ ...inp(false), flex: 1 }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: C.muted, whiteSpace: "nowrap" }}>
+              <input type="checkbox" checked={manual.waiter} onChange={(e) => setManual((m) => ({ ...m, waiter: e.target.checked }))} />
+              Waiter
+            </label>
+            <button onClick={insertManualRx} disabled={!manualReady || locked}
+              style={btn(C.pine, C.paper, { padding: "10px 14px", fontSize: 13, borderRadius: 10, opacity: manualReady && !locked ? 1 : 0.45 })}>
+              Insert
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* hard copy */}
       <div className="rx-card" style={{ padding: 0, overflow: "hidden", background: "#fffdf7", marginBottom: 14 }}>
@@ -2802,7 +3094,7 @@ function IntakeBench({ level, onFinish, onQuit }) {
         </button>
       ) : (
         <button onClick={next} style={btn(C.pine, C.paper, { width: "100%", marginTop: 12 })}>
-          {idx + 1 >= cases.length ? "Finish set" : "Next prescription →"}
+          {queue.length <= 1 ? "Finish set" : "Next prescription →"}
         </button>
       )}
     </div>
@@ -3158,6 +3450,175 @@ function FillCheck({ level, onFinish, onQuit }) {
   );
 }
 
+function managerRxFromFillCase(c, i) {
+  return {
+    id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
+    patient: c.rx.patient,
+    drug: c.rx.drug,
+    strength: c.rx.strength,
+    qty: c.rx.qty,
+    sig: c.rx.sig,
+    fillCase: c,
+  };
+}
+
+/* ---------- Mode 13: ManagerShift ---------- */
+function ManagerShift({ level, onFinish, onQuit }) {
+  const [toVerifyData, setToVerifyData] = useState(() => shuffle(FILLCHECK.filter((c) => c.level <= level)).slice(0, 6).map(managerRxFromFillCase));
+  const [inProduction, setInProduction] = useState([]);
+  const [finalCheck, setFinalCheck] = useState([]);
+  const [completed, setCompleted] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const timers = useRef({});
+
+  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+  useEffect(() => {
+    if (!inProduction.length) return undefined;
+    const tick = setInterval(() => setNow(Date.now()), 350);
+    return () => clearInterval(tick);
+  }, [inProduction.length]);
+
+  const total = completed + toVerifyData.length + inProduction.length + finalCheck.length;
+
+  function approveData(rx) {
+    const etaMs = 5000 + Math.floor(Math.random() * 7001);
+    const ticket = { ...rx, etaMs, startedAt: Date.now(), readyAt: Date.now() + etaMs };
+    setToVerifyData((q) => q.filter((item) => item.id !== rx.id));
+    setInProduction((q) => [...q, ticket]);
+    timers.current[rx.id] = setTimeout(() => {
+      setInProduction((q) => q.filter((item) => item.id !== rx.id));
+      setFinalCheck((q) => [...q, { ...ticket, finishedAt: Date.now() }]);
+      delete timers.current[rx.id];
+    }, etaMs);
+  }
+
+  function finishManagerShift(done = completed, right = correct) {
+    Object.values(timers.current).forEach(clearTimeout);
+    timers.current = {};
+    onFinish({ mode: 13, completed: done, correct: right, total: Math.max(done, total), rating: done ? Math.round((right / done) * 100) : 0 });
+  }
+
+  function finalAction(rx, action) {
+    const shouldApprove = rx.fillCase.errorField === null;
+    const ok = action === "approve" ? shouldApprove : !shouldApprove;
+    const nextCompleted = completed + 1;
+    const nextCorrect = correct + (ok ? 1 : 0);
+    const remaining = toVerifyData.length + inProduction.length + finalCheck.length - 1;
+    setFinalCheck((q) => q.filter((item) => item.id !== rx.id));
+    setCompleted(nextCompleted);
+    if (ok) setCorrect(nextCorrect);
+    if (remaining <= 0) finishManagerShift(nextCompleted, nextCorrect);
+  }
+
+  const Column = ({ title, count, children }) => (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div className="display" style={{ fontSize: 18, fontWeight: 900 }}>{title}</div>
+        <span className="mono" style={{ fontSize: 11, color: C.amber }}>{count}</span>
+      </div>
+      <div style={{ display: "grid", gap: 10 }}>{children}</div>
+    </div>
+  );
+
+  const EmptyLane = ({ text }) => (
+    <div style={{ padding: 14, borderRadius: 12, border: `1px dashed ${C.line}`, color: C.muted, fontSize: 13.5, textAlign: "center" }}>{text}</div>
+  );
+
+  return (
+    <div className="rise">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 16 }}>
+          <Stat label="Cleared" value={completed} color={C.pine} />
+          <Stat label="Accuracy" value={completed ? `${Math.round((correct / completed) * 100)}%` : "-"} color={C.amber} />
+        </div>
+        <button onClick={() => finishManagerShift()} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 13px", fontSize: 13 })}>
+          End shift
+        </button>
+      </div>
+      <ProgressBar value={(completed / Math.max(total, 1)) * 100} />
+
+      <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 16px", lineHeight: 1.5 }}>
+        Manager dashboard: approve clean data entry, watch the simulated technician fill it, then clear final product verification.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+        <Column title="To Verify Data" count={toVerifyData.length}>
+          {!toVerifyData.length && <EmptyLane text="No data-entry scripts waiting." />}
+          {toVerifyData.map((rx) => (
+            <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
+              <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
+              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
+              <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Qty {rx.qty} · {rx.sig}</div>
+              <button onClick={() => approveData(rx)}
+                style={btn(C.green, "#fff", { width: "100%", marginTop: 10, padding: "9px 12px", fontSize: 13, borderRadius: 10, background: C.green })}>
+                Approve data
+              </button>
+            </div>
+          ))}
+        </Column>
+
+        <Column title="In Production" count={inProduction.length}>
+          {!inProduction.length && <EmptyLane text="No tech fills running." />}
+          {inProduction.map((rx) => {
+            const remaining = Math.max(0, Math.ceil((rx.readyAt - now) / 1000));
+            const pct = Math.min(100, Math.max(0, ((rx.etaMs - Math.max(0, rx.readyAt - now)) / rx.etaMs) * 100));
+            return (
+              <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
+                <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
+                <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
+                <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 5 }}>Tech filling: {remaining}s</div>
+                <div style={{ height: 7, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 9 }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: C.amber, transition: "width .25s linear" }} />
+                </div>
+              </div>
+            );
+          })}
+        </Column>
+
+        <Column title="Final Check" count={finalCheck.length}>
+          {!finalCheck.length && <EmptyLane text="No filled vials ready yet." />}
+          {finalCheck.map((rx) => {
+            const f = rx.fillCase.fill;
+            const needsReject = rx.fillCase.errorField !== null;
+            return (
+              <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <VialScatter p={f.pill} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
+                    <div style={{ color: C.muted, fontSize: 13.2 }}>{rx.drug} {rx.strength}</div>
+                    <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Shape: {f.pill.shape}</div>
+                    <div className="mono" style={{ color: C.muted, fontSize: 11 }}>Imprint: {f.pill.imprint}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(31,74,63,0.05)", fontSize: 12.5, color: C.muted }}>
+                  Stock: {f.stockDrug} {f.stockStrength} · Count {f.count}
+                </div>
+                <div className="mono" style={{ color: needsReject ? C.amber : C.muted, fontSize: 10.5, marginTop: 7 }}>Review stock, count, vial pills, and label before clearing.</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => finalAction(rx, "reject")}
+                    style={btn("transparent", C.clay, { border: `1px solid ${C.clay}`, flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10 })}>
+                    Reject
+                  </button>
+                  <button onClick={() => finalAction(rx, "approve")}
+                    style={btn(C.green, "#fff", { flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10, background: C.green })}>
+                    Approve
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </Column>
+      </div>
+
+      <button onClick={onQuit} style={btn("transparent", C.muted, { border: `1px solid ${C.line}`, width: "100%", marginTop: 14, fontSize: 13 })}>
+        Quit to home
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [screen, setScreen] = useState("home"); // home | setup | play | result
   const [mode, setMode] = useState(null);
@@ -3255,6 +3716,9 @@ export default function App() {
         )}
         {screen === "play" && mode === 12 && (
           <FillCheck level={level} onFinish={finish} onQuit={home} />
+        )}
+        {screen === "play" && mode === 13 && (
+          <ManagerShift level={level} onFinish={finish} onQuit={home} />
         )}
         {screen === "result" && (
           <Result result={result} onAgain={() => setScreen("setup")} onHome={home} />
@@ -3464,7 +3928,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
           </div>
         </>
       )}
-      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12) && (
+      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12 || mode === 13) && (
         <div className="rx-card" style={{ padding: 14, marginBottom: 22, fontSize: 13.5, color: C.muted }}>
           {mode === 5
             ? "Each case bundles the full verification workflow — DUR review, the safety alert, and your decision. Just set your difficulty."
@@ -3482,6 +3946,8 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
             ? "Read the hard copy and key the prescription in yourself — sig, quantity, days supply, refills, and DAW. Just set your difficulty."
             : mode === 12
             ? "Check the technician's completed fill against the order — stock, count, the pills in the vial, and the label. Just set your difficulty."
+            : mode === 13
+            ? "Run the manager loop: approve data verification, wait for the auto-tech production timers, then inspect final fills with vial visuals."
             : "Each prescription in this mode naturally covers several skills — sig translation, math, error-catching, and counseling — so there's nothing to toggle. Just set your difficulty."}
         </div>
       )}
@@ -3521,7 +3987,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
         <button onClick={onBegin}
           disabled={blocked}
           style={btn(C.pine, C.paper, { flex: 1, opacity: blocked ? 0.4 : 1 })}>
-          {isMastery ? "Start set →" : mode === 9 ? "Clock in →" : "Start shift →"}
+          {isMastery ? "Start set →" : mode === 9 || mode === 13 ? "Clock in →" : "Start shift →"}
         </button>
       </div>
     </div>
@@ -3919,6 +4385,18 @@ function Result({ result, onAgain, onHome }) {
     stats = [
       { label: "Claims worked", value: result.resolved },
       { label: "Correct calls", value: `${result.correct}/${result.total}` },
+      { label: "Accuracy", value: pct + "%" },
+    ];
+  } else if (result.mode === 13) {
+    const pct = result.completed ? Math.round((result.correct / result.completed) * 100) : 0;
+    grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
+    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
+    line = pct >= 80
+      ? "Manager loop handled: data verified, production moved, final checks cleared."
+      : "Run the manager loop again and slow down at final check.";
+    stats = [
+      { label: "Final checks", value: result.completed },
+      { label: "Correct calls", value: `${result.correct}/${result.completed}` },
       { label: "Accuracy", value: pct + "%" },
     ];
   } else {
