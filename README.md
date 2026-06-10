@@ -1,68 +1,26 @@
-# 💊 RxReady — Pharmacy Arcade
+# Pharmacy Workstation Simulator
 
-A retro-arcade training game for retail pharmacists. Behind the CRT scanlines and
-pixel sprites is a full bench-skills trainer: work a live counter against the clock,
-or drill the individual skills that feed it.
+A POV-style pharmacy simulator focused on data entry and prescription verification.
 
-> ⚠️ **Training tool only.** Drug facts, schedules, NCPDP reject codes, and Virginia
-> rules are for study and practice. Always defer to current references, package
-> labeling, your pharmacy's policies, and the Virginia Board of Pharmacy / DHP in
-> real practice. Pill imprints and NDCs shown in Fill Check are illustrative — use a
-> real pill-ID reference on the job.
+This version is built around the drop-off and pharmacist verification workflow. It does not include filling, counting, stock pulling, or bagging. The goal is to practice reading a hard copy, entering the prescription correctly, and catching mismatches before approval.
 
-## 🎮 What's inside
+## What's Inside
 
-**Story mode — The Shift:** patients line up at your counter (with 8-bit sprites)
-carrying real tasks. Keep the line moving, earn tips, build combos, and protect your
-reputation before the clock runs out. Ranks climb from Pharmacy Intern to Legend of
-the Bench.
+- Data Entry mode: key patient, prescriber, medication, directions, quantity, days supply, refills, and DAW.
+- Sig help: quick reference for common abbreviations like PO, QD, BID, QAM, QHS, and PRN.
+- Verification mode: compare the original prescription to an entered profile and mark incorrect fields.
+- Scoring and feedback: learn which field was wrong and why it matters.
+- POV workstation layout: hard copy on the counter, pharmacy system monitor, keyboard, and drop-off window.
 
-**Stage select — the drills:**
+## Run Locally
 
-| Stage | What you practice |
-|------|-------------------|
-| Rapid Refill | Timed multiple-choice across every skill area |
-| Fill the Rx | Step-by-step prescription workflow |
-| At the Counter | Patient-scenario role-play |
-| Drug Mastery | Brand ↔ generic, class, indication, counseling, schedules (300+ drug DB) |
-| Rx Verification | Clinical/DUR review — verify, clarify, or reject |
-| Script Lab | Build the sig (tap-to-build or free-type with a live expander) |
-| Insurance Desk | Real NCPDP reject codes — refill-too-soon, PA, DAW, compound, Part D 569… |
-| Virginia Law | VA Board of Pharmacy rules (Schedule VI, refills, statewide protocols) |
-| Verify Bench | Data verification — compare the entry to the original hard copy |
-| Data Entry | Key the script in yourself from the hard copy |
-| Fill Check | Verify the technician's completed fill (stock, count, pills, label) |
-
-Plus a searchable **Drug Reference** of 300+ commonly dispensed medications and a
-controlled-substance schedule quick reference.
-
-## 🚀 Run it locally
+Open `index.html` in a browser, or run:
 
 ```bash
 npm install
-npm run dev      # start the dev server (http://localhost:5173)
-npm run build    # production build into dist/
-npm run preview  # preview the production build
+npm run dev
 ```
 
-Requires [Node.js](https://nodejs.org) 18+.
+## Training Note
 
-## 🛠 Tech
-
-Single-component React app built with [Vite](https://vitejs.dev). No CSS framework —
-all styling is self-contained. The only runtime dependency is React.
-
-## 📦 Deploy to GitHub Pages
-
-This repo includes a workflow (`.github/workflows/deploy.yml`) that builds and
-publishes to GitHub Pages on every push to `main`. After your first push:
-
-1. Go to **Settings → Pages** and set **Source: GitHub Actions**.
-2. Push to `main`; the site goes live at `https://<you>.github.io/<repo>/`.
-
-(`base: './'` in `vite.config.js` keeps asset paths relative so it works under any
-repo subpath.)
-
-## 📄 License
-
-MIT — see [LICENSE](LICENSE).
+This is a practice game for learning workflow concepts. It is not medical, legal, or pharmacy practice guidance.
