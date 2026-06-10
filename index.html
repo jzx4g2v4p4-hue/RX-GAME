@@ -3,11 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="RxReady — a retro-arcade training game for retail pharmacists." />
-    <title>RxReady — Pharmacy Arcade</title>
+    <meta name="description" content="RxReady - a retro-arcade training game for retail pharmacists." />
+    <title>RxReady - Pharmacy Arcade</title>
+    <style>
+      html, body, #root { height: 100%; }
+      body { margin: 0; background: #f2e9d6; }
+      .boot {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        color: #1f4a3f;
+        font: 700 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div id="root"><div class="boot">Loading RxReady...</div></div>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      (async function bootRxReady() {
+        try {
+          const response = await fetch('./src/RxReady.jsx', { cache: 'no-cache' });
+          if (!response.ok) throw new Error('Could not load RxReady.jsx');
+          let source = await response.text();
+          source = source.replace(/import React, \{ useState, useEffect, useRef \} from "react";\s*/, 'const { useState, useEffect, useRef } = React;\n');
+          source = source.replace('export default function App()', 'function App()');
+          const compiled = Babel.transform(source, { presets: ['react'], filename: 'RxReady.jsx' }).code;
+          eval(compiled + '\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));');
+        } catch (error) {
+          console.error(error);
+          document.getElementById('root').innerHTML = '<div class="boot">RxReady could not load. Refresh the page in a minute.</div>';
+        }
+      })();
+    </script>
   </body>
 </html>
