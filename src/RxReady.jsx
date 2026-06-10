@@ -134,6 +134,13 @@ const MODES = [
     desc: "Run the bench from a dashboard: verify data, watch production timers, handle drive-thru escalations, and finish with a CII safe audit.",
     icon: "M",
   },
+  {
+    id: 14,
+    title: "Career Mode",
+    tag: "Real Consequences",
+    desc: "Run full manager shifts across multiple days. Earn bonuses, eat penalties, chase promotions, and stay solvent.",
+    icon: "$",
+  },
 ];
 
 /* ============================================================
@@ -397,6 +404,11 @@ const btn = (bg, color, extra = {}) => ({
   fontWeight: 600, fontSize: 16, cursor: "pointer", letterSpacing: "0.2px",
   ...extra,
 });
+
+const money = (value) => {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(value).toFixed(2)}`;
+};
 
 /* ============================================================
    APP
@@ -3468,6 +3480,15 @@ function managerRxFromFillCase(c, i) {
   };
 }
 
+function isSevereFillError(rx) {
+  const fill = rx.fillCase?.fill;
+  const note = (rx.fillCase?.note || "").toLowerCase();
+  const ordered = (rx.fillCase?.rx?.drug || "").toLowerCase();
+  const filled = (fill?.stockDrug || "").toLowerCase();
+  return rx.fillCase?.errorField === "stock"
+    && (filled.includes("clonidine") || ordered.includes("clonazepam") || note.includes("sound-alike"));
+}
+
 function useDriveThruBell(enabled) {
   const timerRef = useRef(null);
   const visualRef = useRef(null);
@@ -3730,8 +3751,81 @@ function SafeAudit({ onBalanced, summary }) {
   );
 }
 
+function ShiftReport({ report, hourlyRate, onContinue }) {
+  const basePay = hourlyRate * 8;
+  const totalBonuses = report.shiftBonuses || 0;
+  const totalPenalties = report.shiftPenalties || 0;
+  const penaltyCount = report.penaltyCount || 0;
+  const netProfit = basePay + totalBonuses - totalPenalties;
+  const rows = [
+    { label: "Base Pay", value: basePay, note: `${money(hourlyRate)} x 8 hours`, color: C.pine },
+    { label: "Total Bonuses", value: totalBonuses, note: "+$15 per clean verification", color: C.green },
+    { label: "Total Penalties", value: -totalPenalties, note: `${penaltyCount} malpractice hit${penaltyCount === 1 ? "" : "s"}`, color: totalPenalties ? C.clay : C.muted },
+    { label: "Net Profit", value: netProfit, note: "Deposited after continue", color: netProfit >= 0 ? C.green : C.clay },
+  ];
+
+  function continueReport() {
+    onContinue({
+      ...report,
+      basePay,
+      totalBonuses,
+      totalPenalties,
+      netProfit,
+      penaltyCount,
+      hourlyRate,
+    });
+  }
+
+  return (
+    <div className="rise">
+      <div className="rx-card" style={{
+        overflow: "hidden", borderRadius: 16, border: `2px solid ${netProfit >= 0 ? C.green : C.clay}`,
+        boxShadow: `0 22px 48px -26px ${netProfit >= 0 ? C.green : C.clay}`,
+      }}>
+        <div style={{ padding: 18, background: "#111816", color: "#f5f1df", borderBottom: `1px solid ${C.line}` }}>
+          <div className="pixel" style={{ fontSize: 10, color: C.amberSoft, marginBottom: 8 }}>DIGITAL SHIFT PAYSTUB</div>
+          <div className="display" style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>Manager Shift Report</div>
+          <div className="mono" style={{ color: "#d7c9a9", fontSize: 11, marginTop: 8 }}>
+            Final checks {report.completed || 0} / Accuracy {report.completed ? Math.round((report.correct / report.completed) * 100) : 0}% / Safe audit tries {report.auditAttempts || 1}
+          </div>
+        </div>
+
+        <div style={{ padding: 18, display: "grid", gap: 10 }}>
+          {rows.map((row) => (
+            <div key={row.label} style={{
+              display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center",
+              padding: "12px 0", borderBottom: row.label === "Net Profit" ? "none" : `1px solid ${C.line}`,
+            }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: row.label === "Net Profit" ? 17 : 14.5 }}>{row.label}</div>
+                <div className="mono" style={{ color: C.muted, fontSize: 10.5, marginTop: 3 }}>{row.note}</div>
+              </div>
+              <div className="display" style={{ fontSize: row.label === "Net Profit" ? 27 : 21, fontWeight: 900, color: row.color }}>
+                {money(row.value)}
+              </div>
+            </div>
+          ))}
+
+          {totalPenalties > 0 && (
+            <div className="pop" style={{ padding: 12, borderRadius: 12, background: "rgba(178,58,36,0.10)", border: `1px solid ${C.clay}` }}>
+              <div style={{ fontWeight: 900, color: C.clay, marginBottom: 4 }}>Malpractice Settlement Posted</div>
+              <div style={{ fontSize: 13.5, lineHeight: 1.45, color: C.ink }}>
+                A severe look-alike/sound-alike approval hit the shift ledger. Career Mode will subtract this from your bank.
+              </div>
+            </div>
+          )}
+
+          <button onClick={continueReport} style={btn(netProfit >= 0 ? C.pine : C.clay, "#fff", { width: "100%", marginTop: 4, background: netProfit >= 0 ? C.pine : C.clay })}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Mode 13: ManagerShift ---------- */
-function ManagerShift({ level, onFinish, onQuit }) {
+function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQuit }) {
   const [toVerifyData, setToVerifyData] = useState(() => shuffle(FILLCHECK.filter((c) => c.level <= level)).slice(0, 6).map(managerRxFromFillCase));
   const [inProduction, setInProduction] = useState([]);
   const [finalCheck, setFinalCheck] = useState([]);
@@ -3741,12 +3835,21 @@ function ManagerShift({ level, onFinish, onQuit }) {
   const [meltdown, setMeltdown] = useState(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [pendingSummary, setPendingSummary] = useState(null);
+  const [shiftReport, setShiftReport] = useState(null);
+  const [shiftBonuses, setShiftBonuses] = useState(0);
+  const [shiftPenalties, setShiftPenalties] = useState(0);
+  const [penaltyCount, setPenaltyCount] = useState(0);
+  const [malpracticeFlash, setMalpracticeFlash] = useState(null);
   const timers = useRef({});
   const pendingSummaryRef = useRef(null);
   const bellPenaltyRef = useRef(0);
+  const malpracticeTimerRef = useRef(null);
   const bell = useDriveThruBell(!auditOpen);
 
-  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+  useEffect(() => () => {
+    Object.values(timers.current).forEach(clearTimeout);
+    window.clearTimeout(malpracticeTimerRef.current);
+  }, []);
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 350);
     return () => clearInterval(tick);
@@ -3764,18 +3867,21 @@ function ManagerShift({ level, onFinish, onQuit }) {
     timers.current = {};
   }
 
-  function buildManagerSummary(done = completed, right = correct) {
+  function buildManagerSummary(done = completed, right = correct, bonuses = shiftBonuses, penalties = shiftPenalties, penaltyHits = penaltyCount) {
     return {
       mode: 13,
       completed: done,
       correct: right,
       total: Math.max(done, total),
       rating: done ? Math.round((right / done) * 100) : 0,
+      shiftBonuses: bonuses,
+      shiftPenalties: penalties,
+      penaltyCount: penaltyHits,
     };
   }
 
-  function startSafeAudit(done = completed, right = correct) {
-    const summary = buildManagerSummary(done, right);
+  function startSafeAudit(done = completed, right = correct, bonuses = shiftBonuses, penalties = shiftPenalties, penaltyHits = penaltyCount) {
+    const summary = buildManagerSummary(done, right, bonuses, penalties, penaltyHits);
     clearProductionTimers();
     pendingSummaryRef.current = summary;
     setPendingSummary(summary);
@@ -3786,7 +3892,16 @@ function ManagerShift({ level, onFinish, onQuit }) {
 
   function finishAfterAudit(audit) {
     const base = pendingSummaryRef.current || buildManagerSummary();
-    onFinish({ ...base, auditBalanced: true, auditAttempts: audit.attempts, auditVarianceTotal: audit.varianceTotal });
+    setAuditOpen(false);
+    setShiftReport({ ...base, auditBalanced: true, auditAttempts: audit.attempts, auditVarianceTotal: audit.varianceTotal });
+  }
+
+  function continueShiftReport(payload) {
+    if (onShiftComplete) {
+      onShiftComplete(payload);
+      return;
+    }
+    if (onFinish) onFinish(payload);
   }
 
   function resetPressureQueue(queue) {
@@ -3850,13 +3965,27 @@ function ManagerShift({ level, onFinish, onQuit }) {
     if (meltdown || auditOpen) return;
     const shouldApprove = rx.fillCase.errorField === null;
     const ok = action === "approve" ? shouldApprove : !shouldApprove;
+    const malpractice = action === "approve" && !shouldApprove && isSevereFillError(rx);
+    const bonusGain = ok ? 15 : 0;
+    const penaltyGain = malpractice ? 500 : 0;
     const nextCompleted = completed + 1;
     const nextCorrect = correct + (ok ? 1 : 0);
+    const nextBonuses = shiftBonuses + bonusGain;
+    const nextPenalties = shiftPenalties + penaltyGain;
+    const nextPenaltyCount = penaltyCount + (malpractice ? 1 : 0);
     const remaining = toVerifyData.length + inProduction.length + finalCheck.length - 1;
     setFinalCheck((q) => q.filter((item) => item.id !== rx.id));
     setCompleted(nextCompleted);
     if (ok) setCorrect(nextCorrect);
-    if (remaining <= 0) startSafeAudit(nextCompleted, nextCorrect);
+    if (bonusGain) setShiftBonuses(nextBonuses);
+    if (malpractice) {
+      setShiftPenalties(nextPenalties);
+      setPenaltyCount(nextPenaltyCount);
+      setMalpracticeFlash({ patient: rx.patient, drug: `${rx.drug} ${rx.strength}`, penalty: penaltyGain });
+      window.clearTimeout(malpracticeTimerRef.current);
+      malpracticeTimerRef.current = window.setTimeout(() => setMalpracticeFlash(null), 2200);
+    }
+    if (remaining <= 0) startSafeAudit(nextCompleted, nextCorrect, nextBonuses, nextPenalties, nextPenaltyCount);
   }
 
   const PressureMeter = ({ rx }) => {
@@ -3891,6 +4020,7 @@ function ManagerShift({ level, onFinish, onQuit }) {
     <div style={{ padding: 14, borderRadius: 12, border: `1px dashed ${C.line}`, color: C.muted, fontSize: 13.5, textAlign: "center" }}>{text}</div>
   );
 
+  if (shiftReport) return <ShiftReport report={shiftReport} hourlyRate={hourlyRate} onContinue={continueShiftReport} />;
   if (auditOpen) return <SafeAudit onBalanced={finishAfterAudit} summary={pendingSummary} />;
 
   const hottest = livePatients.reduce((winner, rx) => {
@@ -3904,6 +4034,8 @@ function ManagerShift({ level, onFinish, onQuit }) {
         <div style={{ display: "flex", gap: 16 }}>
           <Stat label="Cleared" value={completed} color={C.pine} />
           <Stat label="Accuracy" value={completed ? `${Math.round((correct / completed) * 100)}%` : "-"} color={C.amber} />
+          <Stat label="Bonuses" value={money(shiftBonuses)} color={C.green} />
+          <Stat label="Penalties" value={money(shiftPenalties)} color={shiftPenalties ? C.clay : C.muted} />
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button onClick={wtfButton} style={btn(C.clay, "#fff", { padding: "9px 13px", fontSize: 13, borderRadius: 10, background: C.clay })}>
@@ -4019,6 +4151,24 @@ function ManagerShift({ level, onFinish, onQuit }) {
         Quit to home
       </button>
 
+      {malpracticeFlash && (
+        <div className="malpractice-flash" style={{
+          position: "fixed", inset: 0, zIndex: 88, display: "grid", placeItems: "center", padding: 18,
+          background: "rgba(178,20,20,0.88)", color: "#fff", textAlign: "center", pointerEvents: "none",
+        }}>
+          <div style={{
+            width: "min(520px, 100%)", border: "4px solid #fff", borderRadius: 12, padding: 20,
+            background: "rgba(40,0,0,0.72)", boxShadow: "0 0 46px rgba(255,255,255,0.38)",
+          }}>
+            <div className="pixel" style={{ fontSize: 10, color: "#ffe1d8", marginBottom: 10 }}>MALPRACTICE SETTLEMENT</div>
+            <div className="display" style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{money(-malpracticeFlash.penalty)}</div>
+            <p style={{ margin: "12px auto 0", maxWidth: 380, lineHeight: 1.45 }}>
+              Severe verification failure on {malpracticeFlash.patient}: {malpracticeFlash.drug}.
+            </p>
+          </div>
+        </div>
+      )}
+
       {meltdown && (
         <div className="alarm-pulse" style={{
           position: "fixed", inset: 0, zIndex: 90, display: "grid", placeItems: "center", padding: 18,
@@ -4040,6 +4190,165 @@ function ManagerShift({ level, onFinish, onQuit }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CareerMode({ level, onQuit }) {
+  const [bankBalance, setBankBalance] = useState(1000);
+  const [hourlyRate, setHourlyRate] = useState(65);
+  const [dayCount, setDayCount] = useState(1);
+  const [consecutiveCleanShifts, setConsecutiveCleanShifts] = useState(0);
+  const [phase, setPhase] = useState("dashboard");
+  const [lastShift, setLastShift] = useState(null);
+  const [promotion, setPromotion] = useState(null);
+
+  function processShift(payload) {
+    const nextBank = bankBalance + payload.netProfit;
+    const clean = payload.penaltyCount === 0;
+    const nextClean = clean ? consecutiveCleanShifts + 1 : 0;
+    const nextDay = dayCount + 1;
+
+    setLastShift(payload);
+    setBankBalance(nextBank);
+    setDayCount(nextDay);
+
+    if (nextBank < 0) {
+      setConsecutiveCleanShifts(nextClean);
+      setPhase("terminated");
+      return;
+    }
+
+    if (clean && nextClean >= 3) {
+      const nextRate = hourlyRate + 5;
+      setHourlyRate(nextRate);
+      setConsecutiveCleanShifts(0);
+      setPromotion({ from: hourlyRate, to: nextRate, day: nextDay });
+      setPhase("promotion");
+      return;
+    }
+
+    setConsecutiveCleanShifts(nextClean);
+    setPhase("dashboard");
+  }
+
+  const HeaderStat = ({ label, value, color }) => (
+    <div style={{ minWidth: 112, padding: "10px 12px", borderRadius: 12, border: `1px solid ${C.line}`, background: "rgba(255,255,255,0.46)" }}>
+      <div className="display" style={{ fontSize: 20, fontWeight: 900, color: color || C.ink, lineHeight: 1 }}>{value}</div>
+      <div className="mono" style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{label}</div>
+    </div>
+  );
+
+  const careerHeader = (
+    <div className="rx-card" style={{ padding: 14, marginBottom: 14, position: "sticky", top: 8, zIndex: 40 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div>
+          <div className="pixel" style={{ fontSize: 10, color: C.amber, marginBottom: 6 }}>CAREER MODE</div>
+          <div className="display" style={{ fontSize: 25, fontWeight: 900, lineHeight: 1 }}>PIC Track</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <HeaderStat label="Bank" value={money(bankBalance)} color={bankBalance >= 0 ? C.green : C.clay} />
+          <HeaderStat label="Hourly" value={money(hourlyRate)} color={C.pine} />
+          <HeaderStat label="Day" value={dayCount} color={C.amber} />
+          <HeaderStat label="Clean" value={`${consecutiveCleanShifts}/3`} color={consecutiveCleanShifts >= 2 ? C.green : C.muted} />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (phase === "shift") {
+    return (
+      <div className="rise">
+        {careerHeader}
+        <ManagerShift
+          level={Math.max(level || 4, 4)}
+          hourlyRate={hourlyRate}
+          onShiftComplete={processShift}
+          onQuit={() => setPhase("dashboard")}
+        />
+      </div>
+    );
+  }
+
+  if (phase === "terminated") {
+    return (
+      <div className="rise">
+        {careerHeader}
+        <div className="malpractice-flash" style={{
+          borderRadius: 16, padding: 24, textAlign: "center", color: "#fff",
+          background: "radial-gradient(circle at 50% 20%, #f04435, #7a0505 58%, #220000)",
+          border: "4px solid rgba(255,255,255,0.82)", boxShadow: "0 24px 60px -24px rgba(178,58,36,0.9)",
+        }}>
+          <div className="pixel" style={{ fontSize: 12, color: "#ffe1d8", marginBottom: 14 }}>TERMINATED</div>
+          <div className="display" style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>Bankrupt</div>
+          <p style={{ maxWidth: 430, margin: "16px auto 0", lineHeight: 1.5 }}>
+            Your pharmacy career ledger dropped below zero after the last shift. The store has locked you out.
+          </p>
+          {lastShift && (
+            <div className="mono" style={{ marginTop: 16, fontSize: 12, color: "#ffe1d8" }}>
+              Last net: {money(lastShift.netProfit)} / Penalties: {money(lastShift.totalPenalties || 0)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "promotion" && promotion) {
+    return (
+      <div className="rise">
+        {careerHeader}
+        <div className="pop" style={{
+          borderRadius: 16, padding: 24, textAlign: "center", color: "#111816",
+          background: "linear-gradient(135deg, #ffe08a, #f2b441 42%, #fff5cc)",
+          border: "4px solid #fff", boxShadow: "0 26px 60px -24px rgba(192,120,30,0.95)",
+        }}>
+          <div className="pixel blink" style={{ fontSize: 12, color: C.clay, marginBottom: 14 }}>PROMOTION EARNED</div>
+          <div className="display" style={{ fontSize: 40, fontWeight: 900, lineHeight: 1 }}>Hourly Rate Up</div>
+          <p style={{ maxWidth: 450, margin: "16px auto 0", lineHeight: 1.5, fontWeight: 700 }}>
+            Three clean shifts in a row. Corporate bumped you from {money(promotion.from)} to {money(promotion.to)} per hour.
+          </p>
+          <button onClick={() => setPhase("dashboard")} style={btn(C.pine, "#fff", { marginTop: 20, minWidth: 220 })}>
+            Continue career
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rise">
+      {careerHeader}
+      <div className="rx-card" style={{ padding: 22, overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "absolute", right: -28, top: -24, fontSize: 126, opacity: 0.06, fontFamily: "'Fraunces',serif" }}>$</div>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: C.amber, textTransform: "uppercase", marginBottom: 10 }}>
+          Day {dayCount} / Manager Career
+        </div>
+        <div className="display" style={{ fontSize: 31, fontWeight: 900, lineHeight: 1.05, marginBottom: 10 }}>
+          Run the shift. Keep the job.
+        </div>
+        <p style={{ color: C.muted, lineHeight: 1.55, margin: "0 0 18px", maxWidth: 520 }}>
+          Each shift pays eight hours, rewards clean final checks, and punishes severe verification failures with malpractice settlements.
+          Three clean shifts in a row earns an automatic raise.
+        </p>
+
+        {lastShift && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 10, marginBottom: 18 }}>
+            <HeaderStat label="Last net" value={money(lastShift.netProfit)} color={lastShift.netProfit >= 0 ? C.green : C.clay} />
+            <HeaderStat label="Bonuses" value={money(lastShift.totalBonuses || 0)} color={C.green} />
+            <HeaderStat label="Penalties" value={money(lastShift.totalPenalties || 0)} color={lastShift.totalPenalties ? C.clay : C.muted} />
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={() => setPhase("shift")} style={btn(C.pine, "#fff", { flex: "1 1 220px", background: C.pine })}>
+            Start Shift
+          </button>
+          <button onClick={onQuit} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, flex: "0 1 150px" })}>
+            Exit career
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4091,6 +4400,8 @@ export default function App() {
         @keyframes blink { to { opacity:.3 } }
         .alarm-pulse { animation: alarmPulse .46s steps(2,start) infinite; }
         @keyframes alarmPulse { 50% { filter: brightness(1.28) saturate(1.2); transform: translateY(-1px); } }
+        .malpractice-flash { animation: malpracticeFlash .18s steps(2,start) 12; }
+        @keyframes malpracticeFlash { 50% { filter: invert(1) contrast(1.55) saturate(1.45); } }
       `}</style>
       <div className="crtv" /><div className="scan" />
 
@@ -4146,6 +4457,9 @@ export default function App() {
         )}
         {screen === "play" && mode === 13 && (
           <ManagerShift level={level} onFinish={finish} onQuit={home} />
+        )}
+        {screen === "play" && mode === 14 && (
+          <CareerMode level={level} onQuit={home} />
         )}
         {screen === "result" && (
           <Result result={result} onAgain={() => setScreen("setup")} onHome={home} />
@@ -4355,7 +4669,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
           </div>
         </>
       )}
-      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12 || mode === 13) && (
+      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12 || mode === 13 || mode === 14) && (
         <div className="rx-card" style={{ padding: 14, marginBottom: 22, fontSize: 13.5, color: C.muted }}>
           {mode === 5
             ? "Each case bundles the full verification workflow — DUR review, the safety alert, and your decision. Just set your difficulty."
@@ -4375,6 +4689,8 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
             ? "Check the technician's completed fill against the order — stock, count, the pills in the vial, and the label. Just set your difficulty."
             : mode === 13
             ? "Run the manager loop: approve data verification, wait for the auto-tech production timers, then inspect final fills with vial visuals."
+            : mode === 14
+            ? "Career Mode wraps the manager loop in money, penalties, promotions, and bankruptcy. Career shifts force PIC-level cases."
             : "Each prescription in this mode naturally covers several skills — sig translation, math, error-catching, and counseling — so there's nothing to toggle. Just set your difficulty."}
         </div>
       )}
@@ -4414,7 +4730,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
         <button onClick={onBegin}
           disabled={blocked}
           style={btn(C.pine, C.paper, { flex: 1, opacity: blocked ? 0.4 : 1 })}>
-          {isMastery ? "Start set →" : mode === 9 || mode === 13 ? "Clock in →" : "Start shift →"}
+          {isMastery ? "Start set →" : mode === 9 || mode === 13 || mode === 14 ? "Clock in →" : "Start shift →"}
         </button>
       </div>
     </div>
@@ -4823,8 +5139,8 @@ function Result({ result, onAgain, onHome }) {
       : "Run the manager loop again and slow down at final check.";
     stats = [
       { label: "Final checks", value: result.completed },
-      { label: "Correct calls", value: `${result.correct}/${result.completed}` },
-      { label: "Audit tries", value: result.auditAttempts || 1 },
+      { label: "Net", value: result.netProfit !== undefined ? money(result.netProfit) : `${result.correct}/${result.completed}` },
+      { label: "Penalties", value: result.totalPenalties !== undefined ? money(result.totalPenalties) : result.auditAttempts || 1 },
     ];
   } else {
     const r = result.rating;
