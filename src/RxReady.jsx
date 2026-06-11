@@ -143,6 +143,43 @@ const MODES = [
   },
 ];
 
+const MODE_GROUPS = [
+  {
+    id: "career",
+    title: "Full Shift",
+    tag: "POV Simulator",
+    lead: 14,
+    modes: [14, 13, 9],
+    desc: "Career, manager dashboard, pressure events, final checks, and the safe audit in one shift path.",
+  },
+  {
+    id: "verification",
+    title: "Verification Bench",
+    tag: "Pharmacist Work",
+    lead: 10,
+    modes: [11, 10, 5, 12],
+    desc: "Data entry, data verification, DUR review, and finished-product inspection.",
+  },
+  {
+    id: "workflow",
+    title: "Workflow Training",
+    tag: "Stations",
+    lead: 2,
+    modes: [2, 6, 7, 8],
+    desc: "Prescription entry practice, sig building, insurance rejections, and law cases.",
+  },
+  {
+    id: "knowledge",
+    title: "Knowledge Drills",
+    tag: "Practice",
+    lead: 1,
+    modes: [1, 4, 3],
+    desc: "Fast recall, drug mastery, OTC judgment, counseling, and counter conversations.",
+  },
+];
+
+const modeById = (id) => MODES.find((m) => m.id === id);
+
 /* ============================================================
    QUIZ BANK  (Mode 1)
    ============================================================ */
@@ -4506,16 +4543,16 @@ function Home({ onPick, onReference, showRef, setShowRef }) {
 
       {/* HERO — The Shift = PLAY */}
       {(() => {
-        const shift = MODES.find((m) => m.id === 9);
+        const shift = modeById(14);
         return (
-          <button onClick={() => onPick(9)} className="lift"
+          <button onClick={() => onPick(14)} className="lift"
             style={{ width: "100%", textAlign: "left", cursor: "pointer", border: `2px solid ${C.amber}`, borderRadius: 18,
               padding: 22, marginBottom: 22, color: C.paper, position: "relative", overflow: "hidden",
               background: `linear-gradient(135deg, ${C.pine}, ${C.pineSoft})`,
               boxShadow: "0 18px 40px -20px rgba(31,74,63,0.8)" }}>
             <div style={{ position: "absolute", right: -20, top: -20, fontSize: 150, opacity: 0.08, fontFamily: "'Fraunces',serif" }}>℞</div>
             <div className="pixel" style={{ fontSize: 8, color: C.amberSoft, marginBottom: 12 }}>▶ STORY MODE</div>
-            <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>THE SHIFT</div>
+            <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>CAREER MODE</div>
             <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, opacity: 0.9, maxWidth: 460 }}>{shift.desc}</p>
             <div className="pixel blink" style={{ display: "inline-block", marginTop: 16, background: C.amber, color: C.paper, borderRadius: 6, padding: "10px 16px", fontSize: 11 }}>
               ▶ PRESS START
@@ -4525,7 +4562,56 @@ function Home({ onPick, onReference, showRef, setShowRef }) {
       })()}
 
       <div className="pixel" style={{ fontSize: 10, color: C.pine, marginBottom: 14 }}>▸ STAGE SELECT</div>
-      <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
+        {MODE_GROUPS.map((group, gi) => (
+          <div key={group.id} className="rx-card lift" style={{ padding: 18, background: C.card }}>
+            <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 14 }}>
+              <button onClick={() => onPick(group.lead)}
+                style={{
+                  border: "none", cursor: "pointer", minWidth: 58, height: 58, borderRadius: 14,
+                  background: gi === 0 ? C.amber : C.pine, color: C.paper, display: "grid", placeItems: "center",
+                  fontSize: 25, fontFamily: "'Fraunces',serif", fontWeight: 900,
+                }}>
+                {String(gi + 1).padStart(2, "0")}
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span className="display" style={{ fontSize: 22, fontWeight: 900 }}>{group.title}</span>
+                  <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.amber, border: "1px solid " + C.amberSoft, borderRadius: 20, padding: "3px 9px" }}>{group.tag}</span>
+                </div>
+                <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 14.5, lineHeight: 1.5 }}>{group.desc}</p>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 9 }}>
+              {group.modes.map((id) => {
+                const m = modeById(id);
+                return (
+                  <button key={id} onClick={() => onPick(id)}
+                    style={{
+                      border: "1px solid " + (id === group.lead ? C.amberSoft : C.line),
+                      background: id === group.lead ? "rgba(192,120,30,0.10)" : C.paper,
+                      color: C.ink, borderRadius: 12, padding: "11px 12px", cursor: "pointer",
+                      display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 10, alignItems: "center", textAlign: "left",
+                    }}>
+                    <span style={{
+                      width: 34, height: 34, borderRadius: 10, background: id === group.lead ? C.amber : C.paper2,
+                      color: id === group.lead ? C.paper : C.pine, display: "grid", placeItems: "center",
+                      fontFamily: "'Fraunces',serif", fontWeight: 900, fontSize: 17,
+                    }}>{m.icon}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontWeight: 800, fontSize: 15.5 }}>{m.title}</span>
+                      <span style={{ display: "block", color: C.muted, fontSize: 12.5, lineHeight: 1.35 }}>{m.tag}</span>
+                    </span>
+                    <span style={{ color: C.amber, fontSize: 20, lineHeight: 1 }}>&gt;</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "none" }}>
         {MODES.filter((m) => m.id !== 9).map((m, i) => (
           <button key={m.id} className="rx-card lift" onClick={() => onPick(m.id)}
             style={{ textAlign: "left", padding: 20, cursor: "pointer", display: "flex", gap: 16, alignItems: "flex-start", background: C.card }}>
