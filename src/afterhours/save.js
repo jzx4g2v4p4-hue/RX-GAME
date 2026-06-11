@@ -12,7 +12,7 @@ const DEFAULT = {
   shifts: 0,
   relationships: {
     jada:  { affection: 0, stage: 0, dateCount: 0 },
-    marco: { affection: 0, stage: 0, dateCount: 0 },
+    simone: { affection: 0, stage: 0, dateCount: 0 },
     priya: { affection: 0, stage: 0, dateCount: 0 },
   },
   settings: { narrator: 'pro', sound: true },
@@ -44,7 +44,7 @@ export function loadSave() {
       settings: { ...DEFAULT.settings, ...(p.settings || {}) },
       relationships: {
         jada:  { ...DEFAULT.relationships.jada,  ...(p.relationships?.jada  || {}) },
-        marco: { ...DEFAULT.relationships.marco, ...(p.relationships?.marco || {}) },
+        simone: { ...DEFAULT.relationships.simone, ...(p.relationships?.simone || {}) },
         priya: { ...DEFAULT.relationships.priya, ...(p.relationships?.priya || {}) },
       },
     };
