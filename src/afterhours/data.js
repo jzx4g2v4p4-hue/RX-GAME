@@ -125,52 +125,78 @@ export const LOVE_INTERESTS = [
 
   /* ------------------------------------------------------------------ */
   {
-    id: 'marco',
-    name: 'Marco Delgado',
-    age: 32,
-    occupation: 'Patient Advocate',
-    bio: 'Former pharmaceutical rep who burned his bridges when he grew a conscience. Charming, irreverent, and surprisingly principled under the polish.',
-    portraitBg: '#2A3F6A',
+    id: 'simone',
+    name: 'Simone Okafor',
+    age: 30,
+    occupation: 'Palliative Care NP',
+    bio: 'Navigates the hardest conversations in the hospital with quiet precision. Carries a lot without showing it. Warm, direct, and genuinely curious about people — she finds pharmacists deeply underrated.',
+    portraitBg: '#2E1A42',
     portraitAccent: '#C0781E',
     /* swap point — replace placeholder with:
-       <img src="/src/assets/portraits/marco.png" alt="Marco" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}} />
+       <img src="/src/assets/portraits/simone.png" alt="Simone" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}} />
     */
-    intro: "I used to sell you drugs. Now I'm trying to make sure people can actually afford them. Life takes weird turns. Buy me a drink?",
+    intro: "I spend my days helping people accept what can't be changed. You spend yours trying to change outcomes. I think we probably need each other.",
     shiftQuips: {
       good: [
-        "Killing it out there. I always knew you were one of the good ones.",
-        "That's the pharmacist I've heard about. The one people actually trust.",
+        "A pharmacist who actually slows down with the patient. Rare. I've noticed.",
+        "That was excellent. I've watched attendings be less present than you were just now.",
       ],
       bad: [
-        "Hey. Bad days happen to good people. Trust me — I've had the worst days.",
-        "Take a breath. One bad shift doesn't define the next one.",
+        "You look like you need someone to tell you you're doing okay. You are.",
+        "Rough one? My office has decent coffee and zero judgment. Open offer.",
       ],
       neutral: [
-        "Another shift, another story. Tell me the highlight reel later.",
+        "Another afternoon keeping the system honest. Same as it ever was.",
       ],
     },
     dates: [
       {
-        id: 'drinks',
-        label: 'Drinks after work',
-        cost: 20,
+        id: 'coffee',
+        label: 'Coffee break',
+        cost: 10,
         minStage: 0,
-        scene: "A bar that's one step above a dive. He's already there, already has your order figured out.",
+        scene: "The chaplaincy break room, between rounds. She's the only person in this building who doesn't seem to be running from something.",
         dialogues: [
           {
-            prompt: "\"I have to ask,\" he says, swirling his drink. \"Do you hate me for the pharma rep thing?\"",
+            prompt: "She pours coffee without asking how you take it. Gets it right. 'I work with people in crisis — you pick things up.'",
             options: [
-              { text: "\"A little. You bought me lunch twice and I still didn't prescribe your statins.\"", gain: 13 },
-              { text: "\"I've moved on. Apparently so have you.\"", gain: 8 },
-              { text: "\"Tell me why you left first.\"", gain: 15 },
+              { text: "\"That's either a skill or a warning.\"", gain: 12 },
+              { text: "\"You got it exactly right. I'm a little unsettled.\"", gain: 9 },
+              { text: "\"How many pharmacists have you analyzed in a break room?\"", gain: 16 },
             ],
           },
           {
-            prompt: "He tells you about the patient he watched get denied coverage for medication he'd been marking up for years. No self-pity. Just the facts.",
+            prompt: "\"What brought you into pharmacy? The honest answer — not the application essay.\"",
             options: [
-              { text: "\"That's a hard thing to sit with. I'm glad it changed something.\"", gain: 18 },
-              { text: "\"So you're still selling something — just with better branding now.\"", gain: 10 },
-              { text: "\"What did you actually do about it?\"", gain: 14 },
+              { text: "\"Someone I loved got the wrong medication. I decided to be the person who catches that.\"", gain: 18 },
+              { text: "\"I wanted to be useful without the diagnostic glamour. Chemistry made sense.\"", gain: 13 },
+              { text: "\"The biochemistry genuinely fascinated me. Everything else followed.\"", gain: 9 },
+            ],
+          },
+        ],
+        fadeToBlack: null,
+      },
+      {
+        id: 'terrace',
+        label: 'Terrace garden',
+        cost: 0,
+        minStage: 1,
+        scene: "The hospital's third-floor terrace. Nobody uses it in November. You both end up there anyway.",
+        dialogues: [
+          {
+            prompt: "\"I talk to a lot of people about medication near the end of their lives,\" she says. \"I've never asked a pharmacist what it feels like from your side.\"",
+            options: [
+              { text: "\"It's the part of the job that doesn't leave you when you clock out.\"", gain: 18 },
+              { text: "\"Every comfort-care consult lands differently. Some I think about for days.\"", gain: 16 },
+              { text: "\"You're genuinely the first person who's ever asked.\"", gain: 13 },
+            ],
+          },
+          {
+            prompt: "She's quiet for a moment. Then: 'I chose this work because endings matter. Do you think about that?'",
+            options: [
+              { text: "\"Every time I flag a high-alert med. The whole job is the distance between harm and help.\"", gain: 20 },
+              { text: "\"Constantly. It's why we check twice.\"", gain: 14 },
+              { text: "\"I think about it. I don't talk about it much.\" A pause. \"Until now, maybe.\"", gain: 18 },
             ],
           },
         ],
@@ -179,58 +205,32 @@ export const LOVE_INTERESTS = [
       {
         id: 'dinner',
         label: 'Dinner',
-        cost: 50,
-        minStage: 1,
-        scene: "A real restaurant. He dressed up. You're just off shift. Somehow it works.",
-        dialogues: [
-          {
-            prompt: "\"I want to be clear about something,\" he says. \"I like you. Not 'let me pitch you something' like. Just — like.\"",
-            options: [
-              { text: "\"That's either very sincere or the best pitch you've ever run.\"", gain: 15 },
-              { text: "\"I know. That's why I'm still here.\"", gain: 18 },
-              { text: "\"Okay. Me too. Can we order now?\"", gain: 12 },
-            ],
-          },
-          {
-            prompt: "\"If everything changed tomorrow — different city, different job — what would you keep?\"",
-            options: [
-              { text: "\"The work. It actually matters. I'd rebuild everything else around it.\"", gain: 14 },
-              { text: "\"Some people. You'd probably make the short list.\"", gain: 20 },
-              { text: "\"My coffee maker and a good drug reference. Everything else is negotiable.\"", gain: 13 },
-            ],
-          },
-        ],
-        fadeToBlack: null,
-      },
-      {
-        id: 'cooking',
-        label: 'Cook dinner together',
-        cost: 25,
+        cost: 45,
         minStage: 2,
-        scene: "His place. He actually knows how to cook, which is faintly annoying.",
+        scene: "You both had a harder week than you've admitted to anyone. Dinner was her idea.",
         dialogues: [
           {
-            prompt: "He hands you a knife and a cutting board. \"You chop. I'll do the rest. Don't overcomplicate it.\"",
+            prompt: "\"What's something you've gotten wrong that still sits with you?\"",
             options: [
-              { text: "\"I calculated a pediatric dose on a napkin while compounding. I can manage an onion.\"", gain: 13 },
-              { text: "\"This feels like a test.\"", gain: 16 },
-              { text: "\"Deal. You talk. I chop.\"", gain: 10 },
+              { text: "\"A patient I didn't slow down for. She was trying to tell me something. I had three people in line. I still don't know what she needed.\"", gain: 20 },
+              { text: "\"I flagged an interaction and moved on without following up. The prescriber caught it. But I should have called.\"", gain: 16 },
+              { text: "\"I keep a list. It's long. I read it sometimes to remember why pace matters.\"", gain: 14 },
             ],
           },
           {
-            prompt: "After dinner he says, quietly, \"I'm not in a rush with this. With us. Just so you know.\"",
+            prompt: "She looks at you across the table. 'You're genuinely good at this. Does anyone ever actually tell you that?'",
             options: [
-              { text: "\"Good. Neither am I.\"", gain: 18 },
-              { text: "\"That's a very adult thing to say. I respect it.\"", gain: 16 },
-              { text: "\"Is that your way of saying you want dessert first?\"", gain: 13 },
+              { text: "\"Not often enough for it to feel normal. Thank you.\"", gain: 18 },
+              { text: "\"You don't have to say that.\" She says: 'I know. I want to.'", gain: 22 },
+              { text: "\"Ask me again after my next audit.\"", gain: 11 },
             ],
           },
         ],
         fadeToBlack: {
           minAffectionForScene: 120,
-          text: "Dishes done. The evening winds down without hurry. No announcement — just the natural end of a night neither of you wanted to rush.",
+          text: "Neither of you orders dessert. The restaurant fills in around you and neither of you notices. The walk back takes twice as long as it needs to.",
           cut: "★ ★ ★",
-          morning: "He's already up, coffee made, music on low. 'Figured you'd want something before the morning shift.' He hands you a mug. It's exactly right.",
+          morning: "She's already back at the hospital. There's a text: 'The terrace is better in December, apparently. — S'",
         },
       },
     ],

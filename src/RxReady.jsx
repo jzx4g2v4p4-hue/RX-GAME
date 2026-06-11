@@ -4473,7 +4473,10 @@ export default function App() {
          radial-gradient(circle at 88% 82%, rgba(31,74,63,0.10), transparent 42%)`,
     }}>
       <style>{FONTS}{`
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+        input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        button, [role="button"] { touch-action: manipulation; }
         .rx-card { background:${C.card}; border:1px solid ${C.line};
           border-radius:20px; box-shadow: 0 10px 30px -18px rgba(31,74,63,0.45); }
         .display { font-family:'Fraunces', serif; }
@@ -4497,12 +4500,27 @@ export default function App() {
         @keyframes alarmPulse { 50% { filter: brightness(1.28) saturate(1.2); transform: translateY(-1px); } }
         .malpractice-flash { animation: malpracticeFlash .18s steps(2,start) 12; }
         @keyframes malpracticeFlash { 50% { filter: invert(1) contrast(1.55) saturate(1.45); } }
+        /* Mobile game layout */
+        .rx-wrap { padding: 22px 18px 88px; }
+        @supports (padding: env(safe-area-inset-bottom)) {
+          .rx-wrap { padding-bottom: max(88px, calc(env(safe-area-inset-bottom) + 64px)); }
+        }
+        @media (max-width: 480px) {
+          .rx-wrap { padding: 14px 13px 80px; }
+          .rx-card { border-radius: 16px; }
+          .opt { min-height: 52px; }
+          .lift:hover { transform: none; box-shadow: none; }
+          .lift:active { transform: scale(0.97); }
+        }
+        @media (max-width: 360px) {
+          .rx-wrap { padding: 12px 11px 76px; }
+        }
       `}</style>
       <div className="crtv" /><div className="scan" />
 
       {!save.ageGateAccepted && <AgeGate save={save} setSave={setSave} />}
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "26px 18px 80px" }}>
+      <div className="rx-wrap" style={{ maxWidth: 760, margin: "0 auto" }}>
         <Header onHome={home} show={screen !== "home"} save={save} />
 
         {screen === "home" && (
