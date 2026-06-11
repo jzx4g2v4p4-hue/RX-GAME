@@ -4443,6 +4443,22 @@ function CareerMode({ level, onQuit }) {
   );
 }
 
+function SplashScreen({ leaving }) {
+  return (
+    <div className={leaving ? 'splash-leave' : ''} style={{
+      position: 'fixed', inset: 0, background: C.pine,
+      display: 'grid', placeItems: 'center', zIndex: 999,
+      fontFamily: "'Fraunces', serif",
+    }}>
+      <div style={{ textAlign: 'center', padding: '0 24px' }}>
+        <div className="splash-logo" style={{ fontSize: 96, color: C.paper, lineHeight: 1, fontWeight: 900 }}>℞</div>
+        <div className="pixel splash-sub" style={{ fontSize: 12, color: C.amberSoft, marginTop: 16, letterSpacing: 3 }}>RxReady</div>
+        <div className="pixel splash-sub blink" style={{ fontSize: 7, color: 'rgba(242,233,214,0.5)', marginTop: 14, letterSpacing: 2 }}>PHARMACY ARCADE</div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [screen, setScreen] = useState("home"); // home | setup | play | result | afterhours | settings
   const [mode, setMode] = useState(null);
@@ -4453,6 +4469,26 @@ export default function App() {
   const [showRef, setShowRef] = useState(false);
   const [best, setBest] = useState(0);
   const [save, setSave] = useState(() => loadSave());
+  const [splash, setSplash] = useState(true);
+  const [splashLeaving, setSplashLeaving] = useState(false);
+  const [rankToast, setRankToast] = useState(null);
+  const prevRankRef = useRef(null);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setSplashLeaving(true), 1400);
+    const t2 = setTimeout(() => setSplash(false), 1860);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  useEffect(() => {
+    const rank = getRank(save.lifetimeEarned);
+    if (prevRankRef.current !== null && prevRankRef.current !== rank) {
+      setRankToast(rank);
+      const t = setTimeout(() => setRankToast(null), 3600);
+      return () => clearTimeout(t);
+    }
+    prevRankRef.current = rank;
+  }, [save.lifetimeEarned]);
 
   const startSetup = (m) => { setMode(m); setScreen("setup"); };
   const openReference = () => setScreen("reference");
@@ -4500,6 +4536,26 @@ export default function App() {
         @keyframes alarmPulse { 50% { filter: brightness(1.28) saturate(1.2); transform: translateY(-1px); } }
         .malpractice-flash { animation: malpracticeFlash .18s steps(2,start) 12; }
         @keyframes malpracticeFlash { 50% { filter: invert(1) contrast(1.55) saturate(1.45); } }
+        .hero-pulse { animation: heroPulse 3.5s ease-in-out infinite; }
+        @keyframes heroPulse { 0%,100%{box-shadow:0 18px 40px -20px rgba(31,74,63,0.8)} 50%{box-shadow:0 26px 52px -10px rgba(192,120,30,0.5),0 0 0 5px rgba(192,120,30,0.13)} }
+        .grade-ring { animation: gradeRing .5s cubic-bezier(.15,1,.3,1) both; }
+        @keyframes gradeRing { from{opacity:0;transform:scale(0.4)} to{opacity:1;transform:scale(1)} }
+        .grade-pop { animation: gradePop .7s .06s cubic-bezier(.1,1.55,.3,1) both; }
+        @keyframes gradePop { from{opacity:0;transform:scale(0.1) rotate(-22deg)} to{opacity:1;transform:scale(1) rotate(0)} }
+        .correct-flash { animation: correctFlash .55s ease; }
+        @keyframes correctFlash { 0%,100%{background:${C.card}} 45%{background:rgba(46,139,87,0.22)} }
+        .wrong-flash { animation: wrongFlash .55s ease; }
+        @keyframes wrongFlash { 0%,100%{background:${C.card}} 45%{background:rgba(178,58,36,0.15)} }
+        .streak-fire { display:inline-block; animation: streakFire .5s ease-in-out infinite alternate; }
+        @keyframes streakFire { from{filter:brightness(1) saturate(1)} to{filter:brightness(1.3) saturate(1.9) drop-shadow(0 0 6px rgba(255,70,0,.8))} }
+        .rank-toast { animation: rankToast .4s cubic-bezier(.2,.9,.2,1) both; }
+        @keyframes rankToast { from{opacity:0;transform:translate(-50%,-26px) scale(.88)} to{opacity:1;transform:translate(-50%,0) scale(1)} }
+        .splash-logo { animation: splashLogo .9s cubic-bezier(.1,1.4,.3,1) both; }
+        @keyframes splashLogo { from{opacity:0;transform:scale(.3) rotate(-18deg)} to{opacity:1;transform:scale(1) rotate(0)} }
+        .splash-sub { animation: splashSub .65s .3s ease both; }
+        @keyframes splashSub { from{opacity:0;transform:translateY(9px)} to{opacity:1;transform:none} }
+        .splash-leave { animation: splashLeave .45s ease forwards; }
+        @keyframes splashLeave { to{opacity:0} }
         /* Mobile game layout */
         .rx-wrap { padding: 22px 18px 88px; }
         @supports (padding: env(safe-area-inset-bottom)) {
@@ -4517,6 +4573,18 @@ export default function App() {
         }
       `}</style>
       <div className="crtv" /><div className="scan" />
+      {splash && <SplashScreen leaving={splashLeaving} />}
+      {rankToast && (
+        <div className="rank-toast" style={{
+          position: 'fixed', top: 24, left: '50%',
+          background: C.amber, color: C.paper, borderRadius: 22, padding: '11px 24px',
+          zIndex: 500, textAlign: 'center', boxShadow: `0 10px 28px rgba(192,120,30,0.55)`,
+          pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          <div className="pixel" style={{ fontSize: 7, marginBottom: 5, opacity: 0.85 }}>RANK UP</div>
+          <div className="display" style={{ fontSize: 18, fontWeight: 900 }}>{rankToast}</div>
+        </div>
+      )}
 
       {!save.ageGateAccepted && <AgeGate save={save} setSave={setSave} />}
 
@@ -4640,15 +4708,34 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
         <div className="pixel blink" style={{ fontSize: 9, color: C.amber }}>★ INSERT COIN · WORK THE COUNTER ★</div>
       </div>
 
+      {save && save.shifts > 0 && (
+        <div className="rx-card" style={{ padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 11, background: C.pine, color: C.paper,
+            display: 'grid', placeItems: 'center', fontFamily: "'Fraunces',serif",
+            fontSize: 22, fontWeight: 900, flexShrink: 0,
+          }}>℞</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="display" style={{ fontWeight: 900, fontSize: 15.5, lineHeight: 1.2 }}>{getRank(save.lifetimeEarned)}</div>
+            <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+              {save.shifts} shift{save.shifts !== 1 ? 's' : ''} · ${save.lifetimeEarned} earned
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div className="display" style={{ fontSize: 22, fontWeight: 900, color: C.green, lineHeight: 1 }}>${save.currency}</div>
+            <div className="mono" style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>balance</div>
+          </div>
+        </div>
+      )}
+
       {/* HERO — The Shift = PLAY */}
       {(() => {
         const shift = modeById(14);
         return (
-          <button onClick={() => onPick(14)} className="lift"
+          <button onClick={() => onPick(14)} className="lift hero-pulse"
             style={{ width: "100%", textAlign: "left", cursor: "pointer", border: `2px solid ${C.amber}`, borderRadius: 18,
               padding: 22, marginBottom: 22, color: C.paper, position: "relative", overflow: "hidden",
-              background: `linear-gradient(135deg, ${C.pine}, ${C.pineSoft})`,
-              boxShadow: "0 18px 40px -20px rgba(31,74,63,0.8)" }}>
+              background: `linear-gradient(135deg, ${C.pine}, ${C.pineSoft})` }}>
             <div style={{ position: "absolute", right: -20, top: -20, fontSize: 150, opacity: 0.08, fontFamily: "'Fraunces',serif" }}>℞</div>
             <div className="pixel" style={{ fontSize: 8, color: C.amberSoft, marginBottom: 12 }}>▶ STORY MODE</div>
             <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>CAREER MODE</div>
@@ -5076,7 +5163,10 @@ function SpeedMode({ skills, level, onFinish, onQuit }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <Stat label="Score" value={score} color={C.pine} />
-          <Stat label="Streak" value={`×${streak}`} color={C.amber} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {streak >= 3 && <span className="streak-fire" style={{ fontSize: 18, lineHeight: 1 }}>🔥</span>}
+            <Stat label="Streak" value={`×${streak}`} color={streak >= 5 ? C.clay : C.amber} />
+          </div>
         </div>
         <div style={{ fontSize: 18 }}>{"♥".repeat(Math.max(0, lives))}<span style={{ color: C.line }}>{"♡".repeat(3 - Math.max(0, lives))}</span></div>
       </div>
@@ -5089,7 +5179,7 @@ function SpeedMode({ skills, level, onFinish, onQuit }) {
         <div style={{ height: "100%", width: `${(t / timePerQ(level)) * 100}%`, background: t <= 4 ? C.clay : C.amber, transition: "width 1s linear" }} />
       </div>
 
-      <div className="rx-card pop" key={idx} style={{ padding: 20, marginBottom: 16 }}>
+      <div className={`rx-card pop${locked ? (selected === q.answer ? ' correct-flash' : ' wrong-flash') : ''}`} key={idx} style={{ padding: 20, marginBottom: 16 }}>
         <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 16px", lineHeight: 1.35 }}>{q.q}</h3>
         <Options options={q.options} answer={q.answer} selected={selected} onSelect={handleAnswer} locked={locked} />
         {locked && <Explain correct={selected === q.answer} text={q.explain} />}
@@ -5362,12 +5452,12 @@ function Result({ result, onAgain, onHome }) {
 
   return (
     <div className="rise" style={{ textAlign: "center", paddingTop: 8 }}>
-      <div className="pop" style={{
-        width: 110, height: 110, borderRadius: "50%", margin: "0 auto 16px",
-        background: C.card, border: `3px solid ${color}`, display: "grid", placeItems: "center",
-        boxShadow: `0 16px 40px -20px ${color}`,
+      <div className="grade-ring" style={{
+        width: 122, height: 122, borderRadius: "50%", margin: "0 auto 16px",
+        background: C.card, border: `4px solid ${color}`, display: "grid", placeItems: "center",
+        boxShadow: `0 20px 52px -16px ${color}cc`,
       }}>
-        <span className="display" style={{ fontSize: 52, fontWeight: 900, color }}>{grade}</span>
+        <span className="display grade-pop" style={{ fontSize: 56, fontWeight: 900, color, lineHeight: 1 }}>{grade}</span>
       </div>
       <h2 className="display" style={{ fontSize: 26, fontWeight: 900, margin: "0 0 6px" }}>Shift complete</h2>
       <p style={{ color: C.muted, fontSize: 15.5, maxWidth: 460, margin: "0 auto 22px", lineHeight: 1.5 }}>{line}</p>
