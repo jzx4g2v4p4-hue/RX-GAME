@@ -155,7 +155,7 @@ const MODE_GROUPS = [
     tag: "POV Simulator",
     lead: 14,
     modes: [14, 13, 9],
-    desc: "Career, manager dashboard, pressure events, final checks, and the safe audit in one shift path.",
+    desc: "CVS-style chain shift: queues, phones, pickup, drive-thru, waiters, metrics, final checks, and safe audit.",
   },
   {
     id: "verification",
@@ -163,7 +163,7 @@ const MODE_GROUPS = [
     tag: "Pharmacist Work",
     lead: 10,
     modes: [11, 10, 5, 12],
-    desc: "Data entry, data verification, DUR review, and finished-product inspection.",
+    desc: "Focused practice for QT/QV1/QV2: data entry, data verification, DUR review, and final product inspection.",
   },
   {
     id: "workflow",
@@ -184,6 +184,66 @@ const MODE_GROUPS = [
 ];
 
 const modeById = (id) => MODES.find((m) => m.id === id);
+
+const CHAIN_TASKS = [
+  {
+    id: "phones",
+    label: "Phones",
+    action: "Answer phone",
+    start: 2,
+    max: 7,
+    xp: 8,
+    score: 3,
+    reliefMs: 1400,
+    note: "Doctor line, refill status, transfer request.",
+  },
+  {
+    id: "pickup",
+    label: "Pickup",
+    action: "Clear pickup",
+    start: 3,
+    max: 8,
+    xp: 7,
+    score: 3,
+    reliefMs: 1100,
+    note: "Line at register wants ready prescriptions.",
+  },
+  {
+    id: "driveThru",
+    label: "Drive-thru",
+    action: "Run lane",
+    start: 2,
+    max: 6,
+    xp: 9,
+    score: 4,
+    reliefMs: 1800,
+    note: "Car at the window, insurance card in hand.",
+  },
+  {
+    id: "counsel",
+    label: "Counsel",
+    action: "Counsel",
+    start: 1,
+    max: 5,
+    xp: 10,
+    score: 5,
+    reliefMs: 1300,
+    note: "New therapy consult waiting for pharmacist.",
+  },
+  {
+    id: "waiters",
+    label: "Waiters",
+    action: "Prioritize waiter",
+    start: 2,
+    max: 7,
+    xp: 9,
+    score: 4,
+    reliefMs: 2200,
+    note: "Patient is waiting in-store for the fill.",
+  },
+];
+
+const initialChainTasks = () => Object.fromEntries(CHAIN_TASKS.map((task) => [task.id, task.start]));
 
 /* ============================================================
    QUIZ BANK  (Mode 1)
@@ -4011,15 +4071,22 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   const [shiftPenalties, setShiftPenalties] = useState(0);
   const [penaltyCount, setPenaltyCount] = useState(0);
   const [malpracticeFlash, setMalpracticeFlash] = useState(null);
+  const [chainTasks, setChainTasks] = useState(initialChainTasks);
+  const [serviceScore, setServiceScore] = useState(84);
+  const [chainXp, setChainXp] = useState(0);
+  const [chainStreak, setChainStreak] = useState(0);
+  const [chainToast, setChainToast] = useState(null);
   const timers = useRef({});
   const pendingSummaryRef = useRef(null);
   const bellPenaltyRef = useRef(0);
   const malpracticeTimerRef = useRef(null);
+  const chainToastRef = useRef(null);
   const bell = useDriveThruBell(!auditOpen);
 
   useEffect(() => () => {
     Object.values(timers.current).forEach(clearTimeout);
     window.clearTimeout(malpracticeTimerRef.current);
+    window.clearTimeout(chainToastRef.current);
   }, []);
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 350);
@@ -4028,9 +4095,44 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
 
   const total = completed + toVerifyData.length + inProduction.length + finalCheck.length;
   const livePatients = [...toVerifyData, ...inProduction, ...finalCheck];
+  const chainLoad = Object.values(chainTasks).reduce((sum, value) => sum + value, 0);
+  const chainPressure = Math.min(100, Math.round((chainLoad / 28) * 100));
+  const serviceColor = serviceScore >= 85 ? C.green : serviceScore >= 70 ? C.amber : C.clay;
 
   function patientLeftMs(rx) {
     return Math.max(0, rx.patienceMs - (now - rx.patienceStartedAt));
+  }
+  function flashChainToast(message) {
+    setChainToast(message);
+    window.clearTimeout(chainToastRef.current);
+    chainToastRef.current = window.setTimeout(() => setChainToast(null), 1800);
+  }
+
+  function bumpQueuePatience(ms) {
+    const bump = (queue) => queue.map((rx) => ({ ...rx, patienceMs: Math.min(rx.patienceMs + ms, 120000) }));
+    setToVerifyData((q) => bump(q));
+    setInProduction((q) => bump(q));
+    setFinalCheck((q) => bump(q));
+  }
+
+  function addShiftXp(amount, scoreDelta, message) {
+    setChainXp((xp) => xp + amount);
+    setServiceScore((score) => Math.max(0, Math.min(100, score + scoreDelta)));
+    if (amount > 0) setChainStreak((streak) => streak + 1);
+    if (message) flashChainToast(message);
+  }
+
+  function handleChainTask(taskId) {
+    const task = CHAIN_TASKS.find((item) => item.id === taskId);
+    if (!task || auditOpen || meltdown) return;
+    const count = chainTasks[taskId] || 0;
+    if (count <= 0) {
+      flashChainToast(`${task.label} is already clear.`);
+      return;
+    }
+    setChainTasks((tasks) => ({ ...tasks, [taskId]: Math.max(0, tasks[taskId] - 1) }));
+    bumpQueuePatience(task.reliefMs);
+    addShiftXp(task.xp, task.score, `${task.action}: +${task.xp} XP`);
   }
 
   function clearProductionTimers() {
@@ -4048,6 +4150,9 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       shiftBonuses: bonuses,
       shiftPenalties: penalties,
       penaltyCount: penaltyHits,
+      serviceScore,
+      chainXp,
+      chainLoad,
     };
   }
 
@@ -4119,12 +4224,24 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     setFinalCheck((q) => squeeze(q));
   }, [bell.bellCount, auditOpen]);
 
+  useEffect(() => {
+    if (auditOpen || shiftReport) return undefined;
+    const interval = window.setInterval(() => {
+      const task = CHAIN_TASKS[Math.floor(Math.random() * CHAIN_TASKS.length)];
+      setChainTasks((tasks) => ({ ...tasks, [task.id]: Math.min(task.max, (tasks[task.id] || 0) + 1) }));
+      setServiceScore((score) => Math.max(0, score - (chainLoad >= 14 ? 3 : 1)));
+      setChainStreak(0);
+    }, 9000);
+    return () => window.clearInterval(interval);
+  }, [auditOpen, shiftReport, chainLoad]);
+
   function approveData(rx) {
     if (meltdown || auditOpen) return;
     const etaMs = 5000 + Math.floor(Math.random() * 7001);
     const ticket = { ...rx, etaMs, startedAt: Date.now(), readyAt: Date.now() + etaMs };
     setToVerifyData((q) => q.filter((item) => item.id !== rx.id));
     setInProduction((q) => [...q, ticket]);
+    addShiftXp(5, 1, "QV1 verified: +5 XP");
     timers.current[rx.id] = setTimeout(() => {
       setInProduction((q) => q.filter((item) => item.id !== rx.id));
       setFinalCheck((q) => [...q, { ...ticket, finishedAt: Date.now() }]);
@@ -4149,9 +4266,12 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     setCompleted(nextCompleted);
     if (ok) setCorrect(nextCorrect);
     if (bonusGain) setShiftBonuses(nextBonuses);
+    addShiftXp(ok ? 12 : 0, ok ? 3 : -8, ok ? "QV2 clean check: +12 XP" : "Verification miss: service score hit");
     if (malpractice) {
       setShiftPenalties(nextPenalties);
       setPenaltyCount(nextPenaltyCount);
+      setServiceScore((score) => Math.max(0, score - 25));
+      setChainStreak(0);
       setMalpracticeFlash({ patient: rx.patient, drug: `${rx.drug} ${rx.strength}`, penalty: penaltyGain });
       window.clearTimeout(malpracticeTimerRef.current);
       malpracticeTimerRef.current = window.setTimeout(() => setMalpracticeFlash(null), 2200);
@@ -4191,6 +4311,34 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     <div style={{ padding: 14, borderRadius: 12, border: `1px dashed ${C.line}`, color: C.muted, fontSize: 13.5, textAlign: "center" }}>{text}</div>
   );
 
+
+  const ChainTaskButton = ({ task }) => {
+    const count = chainTasks[task.id] || 0;
+    const hot = count >= Math.max(4, task.max - 2);
+    return (
+      <button
+        onClick={() => handleChainTask(task.id)}
+        style={{
+          border: `1px solid ${hot ? C.clay : C.line}`,
+          background: hot ? "rgba(178,58,36,0.10)" : C.card,
+          color: C.ink,
+          borderRadius: 12,
+          padding: 11,
+          cursor: "pointer",
+          textAlign: "left",
+          minHeight: 78,
+          display: "grid",
+          gap: 5,
+        }}
+      >
+        <span className="mono" style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: hot ? C.clay : C.amber }}>
+          {task.label} x{count}
+        </span>
+        <span style={{ fontWeight: 900, fontSize: 14.5 }}>{task.action}</span>
+        <span style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.35 }}>{task.note}</span>
+      </button>
+    );
+  };
   if (shiftReport) return <ShiftReport report={shiftReport} hourlyRate={hourlyRate} onContinue={continueShiftReport} />;
   if (auditOpen) return <SafeAudit onBalanced={finishAfterAudit} summary={pendingSummary} />;
 
@@ -4219,8 +4367,57 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       </div>
       <ProgressBar value={(completed / Math.max(total, 1)) * 100} />
 
+      <div className="rx-card" style={{ padding: 14, margin: "14px 0", borderRadius: 14, background: "#fffaf0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 12 }}>
+          <div>
+            <div className="mono" style={{ fontSize: 10, color: C.amber, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>
+              Retail chain wallboard
+            </div>
+            <div className="display" style={{ fontSize: 24, fontWeight: 900, lineHeight: 1 }}>
+              QT / QV1 / QP / QV2
+            </div>
+            <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.45, marginTop: 5 }}>
+              Clear service fires while protecting final-check accuracy.
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(72px, 1fr))", gap: 8, minWidth: 250 }}>
+            <HeaderStatLite label="Service" value={`${serviceScore}%`} color={serviceColor} />
+            <HeaderStatLite label="XP" value={chainXp} color={C.amber} />
+            <HeaderStatLite label="Streak" value={`x${chainStreak}`} color={chainStreak >= 5 ? C.green : C.pine} />
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginBottom: 11 }}>
+          {[
+            ["QT", toVerifyData.length, "intake/data"],
+            ["QV1", toVerifyData.length, "pharmacist data check"],
+            ["QP", inProduction.length, "tech production"],
+            ["QV2", finalCheck.length, "final product check"],
+          ].map(([label, value, sub]) => (
+            <div key={label} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 10px", background: C.paper }}>
+              <div className="display" style={{ fontSize: 21, fontWeight: 900, color: C.pine, lineHeight: 1 }}>{label}</div>
+              <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 4 }}>{value} waiting</div>
+              <div style={{ color: C.muted, fontSize: 11, marginTop: 4, lineHeight: 1.25 }}>{sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ height: 8, background: C.paper2, borderRadius: 20, overflow: "hidden", marginBottom: 11 }}>
+          <div style={{ width: `${chainPressure}%`, height: "100%", background: chainPressure >= 70 ? C.clay : chainPressure >= 45 ? C.amber : C.green, transition: "width .25s ease" }} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(142px, 1fr))", gap: 8 }}>
+          {CHAIN_TASKS.map((task) => <ChainTaskButton key={task.id} task={task} />)}
+        </div>
+        {chainToast && (
+          <div className="pop" style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(46,139,87,0.12)", border: `1px solid ${C.green}`, color: C.pine, fontWeight: 800, fontSize: 13 }}>
+            {chainToast}
+          </div>
+        )}
+      </div>
+
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 16px", lineHeight: 1.5 }}>
-        Manager dashboard: approve clean data entry, watch production, clear final product verification, and keep the waiting room from boiling over.
+        Big-chain shift loop: verify QT/QV1, keep QP moving, clear QV2 final checks, and keep phones, pickup, drive-thru, counseling, and waiters under control.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10, marginBottom: 14 }}>
@@ -4246,7 +4443,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-        <Column title="To Verify Data" count={toVerifyData.length}>
+        <Column title="QT / QV1 Data" count={toVerifyData.length}>
           {!toVerifyData.length && <EmptyLane text="No data-entry scripts waiting." />}
           {toVerifyData.map((rx) => (
             <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
@@ -4256,13 +4453,13 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
               <PressureMeter rx={rx} />
               <button onClick={() => approveData(rx)}
                 style={btn(C.green, "#fff", { width: "100%", marginTop: 10, padding: "9px 12px", fontSize: 13, borderRadius: 10, background: C.green })}>
-                Approve data
+                Verify QV1
               </button>
             </div>
           ))}
         </Column>
 
-        <Column title="In Production" count={inProduction.length}>
+        <Column title="QP Production" count={inProduction.length}>
           {!inProduction.length && <EmptyLane text="No tech fills running." />}
           {inProduction.map((rx) => {
             const remaining = Math.max(0, Math.ceil((rx.readyAt - now) / 1000));
@@ -4271,7 +4468,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
               <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
                 <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
                 <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
-                <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 5 }}>Tech filling: {remaining}s</div>
+                <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 5 }}>QP fill running: {remaining}s</div>
                 <div style={{ height: 7, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 9 }}>
                   <div style={{ width: `${pct}%`, height: "100%", background: C.amber, transition: "width .25s linear" }} />
                 </div>
@@ -4281,7 +4478,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
           })}
         </Column>
 
-        <Column title="Final Check" count={finalCheck.length}>
+        <Column title="QV2 Final Check" count={finalCheck.length}>
           {!finalCheck.length && <EmptyLane text="No filled vials ready yet." />}
           {finalCheck.map((rx) => {
             const f = rx.fillCase.fill;
@@ -4414,8 +4611,8 @@ function CareerMode({ level, onQuit }) {
     <div className="rx-card" style={{ padding: 14, marginBottom: 14, position: "sticky", top: 8, zIndex: 40 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
-          <div className="pixel" style={{ fontSize: 10, color: C.amber, marginBottom: 6 }}>CAREER MODE</div>
-          <div className="display" style={{ fontSize: 25, fontWeight: 900, lineHeight: 1 }}>PIC Track</div>
+          <div className="pixel" style={{ fontSize: 10, color: C.amber, marginBottom: 6 }}>RETAIL CHAIN CAREER</div>
+          <div className="display" style={{ fontSize: 25, fontWeight: 900, lineHeight: 1 }}>Chain Pharmacy Shift</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <HeaderStat label="Bank" value={money(bankBalance)} color={bankBalance >= 0 ? C.green : C.clay} />
@@ -4493,13 +4690,13 @@ function CareerMode({ level, onQuit }) {
       <div className="rx-card" style={{ padding: 22, overflow: "hidden", position: "relative" }}>
         <div style={{ position: "absolute", right: -28, top: -24, fontSize: 126, opacity: 0.06, fontFamily: "'Fraunces',serif" }}>$</div>
         <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: C.amber, textTransform: "uppercase", marginBottom: 10 }}>
-          Day {dayCount} / Manager Career
+          Day {dayCount} / Retail Chain Career
         </div>
         <div className="display" style={{ fontSize: 31, fontWeight: 900, lineHeight: 1.05, marginBottom: 10 }}>
-          Run the shift. Keep the job.
+          Clock in. Clear the queues. Keep the store alive.
         </div>
         <p style={{ color: C.muted, lineHeight: 1.55, margin: "0 0 18px", maxWidth: 520 }}>
-          Each shift pays eight hours, rewards clean final checks, and punishes severe verification failures with malpractice settlements.
+          Work a CVS-style retail pharmacy shift without official branding: QT/QV1/QP/QV2 queues, phones, pickup, drive-thru, counsel calls, waiters, metrics, and final-check consequences.
           Three clean shifts in a row earns an automatic raise.
         </p>
 
@@ -4818,11 +5015,11 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
               padding: 22, marginBottom: 22, color: C.paper, position: "relative", overflow: "hidden",
               background: `linear-gradient(135deg, ${C.pine}, ${C.pineSoft})` }}>
             <div style={{ position: "absolute", right: -20, top: -20, fontSize: 150, opacity: 0.08, fontFamily: "'Fraunces',serif" }}>℞</div>
-            <div className="pixel" style={{ fontSize: 8, color: C.amberSoft, marginBottom: 12 }}>▶ STORY MODE</div>
+            <div className="pixel" style={{ fontSize: 8, color: C.amberSoft, marginBottom: 12 }}>▶ SHIFT SIM</div>
             <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>CAREER MODE</div>
-            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, opacity: 0.9, maxWidth: 460 }}>{shift.desc}</p>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, opacity: 0.9, maxWidth: 460 }}>Run the whole retail pharmacy loop: QT/QV1/QP/QV2 queues, phones, pickup, drive-thru, waiters, counseling, metrics, and final-check pressure.</p>
             <div className="pixel blink" style={{ display: "inline-block", marginTop: 16, background: C.amber, color: C.paper, borderRadius: 6, padding: "10px 16px", fontSize: 11 }}>
-              ▶ PRESS START
+              ▶ CLOCK IN
             </div>
           </button>
         );
@@ -5169,6 +5366,14 @@ function Stat({ label, value, color }) {
     <div style={{ textAlign: "center" }}>
       <div className="display" style={{ fontSize: 22, fontWeight: 900, color: color || C.ink, lineHeight: 1 }}>{value}</div>
       <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.muted, marginTop: 3 }}>{label}</div>
+    </div>
+  );
+}
+function HeaderStatLite({ label, value, color }) {
+  return (
+    <div style={{ padding: "8px 10px", borderRadius: 10, border: `1px solid ${C.line}`, background: C.paper, textAlign: "center" }}>
+      <div className="display" style={{ fontSize: 19, fontWeight: 900, color: color || C.ink, lineHeight: 1 }}>{value}</div>
+      <div className="mono" style={{ fontSize: 8.5, letterSpacing: 1, textTransform: "uppercase", color: C.muted, marginTop: 4 }}>{label}</div>
     </div>
   );
 }
