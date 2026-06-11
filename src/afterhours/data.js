@@ -120,6 +120,32 @@ export const LOVE_INTERESTS = [
           morning: "She leaves her coffee on your counter without waking you. There's a note: 'You're still bad at taking it black. — J'",
         },
       },
+      {
+        id: 'late_floor',
+        label: 'Late on the floor',
+        cost: 0,
+        minStage: 3,
+        scene: "Past midnight. A rough code. You find each other in the quiet end of the hallway afterward — both still holding it together the way people do when they have to.",
+        dialogues: [
+          {
+            prompt: "She leans against the wall next to you. Quiet for a long moment. Then: 'I've been doing this long enough to know it doesn't get easier. You just get better at carrying it.'",
+            options: [
+              { text: "'You help. That's not a small thing.'", gain: 24 },
+              { text: "'Yeah. I think that's right.' You mean it completely.", gain: 20 },
+              { text: "'Some nights it feels like that's exactly the wrong thing to get good at.'", gain: 16 },
+            ],
+          },
+          {
+            prompt: "She looks over at you. 'I keep expecting it to feel normal — you. This.' A pause. 'It doesn't. I mean that in a good way.'",
+            options: [
+              { text: "'Same. Every time.' You don't dress it up.", gain: 26 },
+              { text: "'You could have told me that six weeks ago.' You're smiling.", gain: 22 },
+              { text: "Take her hand. Don't say anything.", gain: 24 },
+            ],
+          },
+        ],
+        fadeToBlack: null,
+      },
     ],
   },
 
@@ -233,6 +259,32 @@ export const LOVE_INTERESTS = [
           morning: "She's already back at the hospital. There's a text: 'The terrace is better in December, apparently. — S'",
         },
       },
+      {
+        id: 'saturday_market',
+        label: 'Saturday market',
+        cost: 20,
+        minStage: 3,
+        scene: "Off-duty. Both of you out of scrubs for the first time in recent memory. You run into each other at the farmers market and neither of you leaves.",
+        dialogues: [
+          {
+            prompt: "She buys two things and then walks beside you with her hands in her coat pockets. 'I'm terrible at this,' she says. 'Days off. Turns out I don't know what I like outside of the hospital.'",
+            options: [
+              { text: "'I think you like this. You've been smiling for twenty minutes.'", gain: 24 },
+              { text: "'Then we figure it out. We have time.'", gain: 22 },
+              { text: "'That's the first thing you've said today that I don't believe.'", gain: 18 },
+            ],
+          },
+          {
+            prompt: "At a flower stall, she picks something up and puts it back. 'I spend my whole career telling people what matters. I'm not always sure I live that way.' A pause. 'I think you're changing that.'",
+            options: [
+              { text: "'You've been showing me the same thing. It goes both ways.'", gain: 26 },
+              { text: "Pick up what she put down. Hand it to her without a word.", gain: 24 },
+              { text: "'Don't give me credit for something you were already doing.'", gain: 20 },
+            ],
+          },
+        ],
+        fadeToBlack: null,
+      },
     ],
   },
 
@@ -344,6 +396,142 @@ export const LOVE_INTERESTS = [
           text: "The restaurant closes around you. Neither of you noticed. Walking out, she takes your hand — briefly, like she's testing whether she's allowed. She is.",
           cut: "★ ★ ★",
           morning: "She's already gone when you wake up — on call at 5am. Your phone has a message: 'methotrexate + NSAIDs. Go.' You smile and answer it.",
+        },
+      },
+      {
+        id: 'board_prep',
+        label: 'Board exam prep',
+        cost: 0,
+        minStage: 3,
+        scene: "She's deep in boards prep. You offered to quiz her. She accepted before you finished asking.",
+        dialogues: [
+          {
+            prompt: "She's halfway through a practice question set, muttering pharmacokinetics under her breath. 'This is the most relaxed I've been in a week,' she says. You're not sure if she means the studying or the company.",
+            options: [
+              { text: "'Then let's get through renal dosing so you can actually relax.'", gain: 20 },
+              { text: "'I'll take that as a compliment on my quizzing technique.'", gain: 18 },
+              { text: "Cover the flashcard with your hand. 'Five minutes. You've earned it.'", gain: 24 },
+            ],
+          },
+          {
+            prompt: "Two hours in, she closes the book. 'I'm going to pass this because I had someone worth impressing.' She says it like a clinical observation. It's not.",
+            options: [
+              { text: "'You'd pass either way. But I'm glad I was here.'", gain: 26 },
+              { text: "'That's the most romantic thing you've ever said to me.' She rolls her eyes. You're both right.", gain: 24 },
+              { text: "'You never needed me for that. But I'll take the credit.'", gain: 20 },
+            ],
+          },
+        ],
+        fadeToBlack: null,
+      },
+    ],
+  },
+
+  /* ------------------------------------------------------------------ */
+  {
+    id: 'lin',
+    name: 'Lin Nakamura',
+    age: 27,
+    occupation: 'Clinical Pharmacist / Drug Info',
+    bio: "Precise, citation-ready, and the person who writes the pharmacy intranet guidelines that everyone ignores until there's a lawsuit. She warms up slowly and trusts people who catch what she would have caught.",
+    portraitBg: '#1A2E4A',
+    portraitAccent: '#7EB8C9',
+    intro: "Your warfarin-fluconazole interaction catch last month got cited in the pharmacy newsletter. I wrote the newsletter. I noticed.",
+    shiftQuips: {
+      good: [
+        "Accurate, efficient, safe. If only everyone else defaulted to that.",
+        "You actually read the full monograph before you answered. I respect that.",
+      ],
+      bad: [
+        "I've run fourteen DI consults today. Tell me the worst part of your day.",
+        "Sit with me. I'll get the bad coffee. You talk first.",
+      ],
+      neutral: [
+        "Another day cross-referencing what the prescribers should have caught. Standard Tuesday.",
+      ],
+    },
+    dates: [
+      {
+        id: 'terminal',
+        label: 'DI terminal',
+        cost: 0,
+        minStage: 0,
+        scene: "The drug information terminal in the pharmacy library. You both ended up there after hours on the same consult.",
+        dialogues: [
+          {
+            prompt: "She pulls up the same reference you were looking for. 'You were going to cite Lexicomp? I have the primary literature.'",
+            options: [
+              { text: "Apologetically clinical — acknowledge Lexicomp was a shortcut.", gain: 8 },
+              { text: "Confident about your choice — it was fast and accurate.", gain: 12 },
+              { text: "Ask to see hers. You're genuinely interested.", gain: 16 },
+            ],
+          },
+          {
+            prompt: "The consult resolves. She closes her laptop. 'What brought you into this part of pharmacy?' She's actually asking.",
+            options: [
+              { text: "Personal backstory about the job — the real answer.", gain: 18 },
+              { text: "Clinical answer — drug information was the most rigorous track.", gain: 10 },
+              { text: "Deflect with a question back — ask her the same thing.", gain: 13 },
+            ],
+          },
+        ],
+        fadeToBlack: null,
+      },
+      {
+        id: 'after_rounds',
+        label: 'After rounds',
+        cost: 10,
+        minStage: 1,
+        scene: "The clinical pharmacist lounge, which is mostly just a table with good chairs. She saved you a seat.",
+        dialogues: [
+          {
+            prompt: "She slides you a sticky note. A drug interaction you flagged last week, with two primary citations she found supporting your call. 'You were right. I looked it up.'",
+            options: [
+              { text: "Thank her warmly — this matters more than she knows.", gain: 16 },
+              { text: "Make a clinical point about why the interaction mechanism matters.", gain: 10 },
+              { text: "Say you knew and wanted her to confirm it anyway.", gain: 18 },
+            ],
+          },
+          {
+            prompt: "'I don't usually do this,' she says, meaning spending non-required time with a person at work. 'I know,' you say.",
+            options: [
+              { text: "Leave space. Let the moment hold.", gain: 18 },
+              { text: "Ask what changed.", gain: 15 },
+              { text: "Tell her you noticed a while ago.", gain: 20 },
+            ],
+          },
+        ],
+        fadeToBlack: null,
+      },
+      {
+        id: 'dinner',
+        label: 'Off-campus dinner',
+        cost: 40,
+        minStage: 2,
+        scene: "First time either of you has been outside the hospital for something that isn't a conference. The restaurant doesn't know what a DUR is. It's fine.",
+        dialogues: [
+          {
+            prompt: "'Tell me something true about yourself that's not on your CV.' She's half-smiling. This is her version of playful.",
+            options: [
+              { text: "Vulnerable personal answer — something she couldn't have predicted.", gain: 20 },
+              { text: "Something clinical that reveals character — what you actually care about.", gain: 14 },
+              { text: "Turn it back on her. Same question, same stakes.", gain: 16 },
+            ],
+          },
+          {
+            prompt: "She says: 'I think I've been using precision as a reason not to let people close. It's easier to verify facts than to trust people.'",
+            options: [
+              { text: "Tell her you see that and it's okay.", gain: 20 },
+              { text: "Say you have the same problem.", gain: 18 },
+              { text: "Just sit with it and let it breathe.", gain: 22 },
+            ],
+          },
+        ],
+        fadeToBlack: {
+          minAffectionForScene: 120,
+          text: "The restaurant clears out. You stay. She doesn't check her phone once. Neither do you.",
+          cut: "★ ★ ★",
+          morning: "A morning text: 'P450 3A4 inhibitors. You were right about all of them. — L'",
         },
       },
     ],

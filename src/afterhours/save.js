@@ -14,6 +14,7 @@ const DEFAULT = {
     jada:  { affection: 0, stage: 0, dateCount: 0 },
     simone: { affection: 0, stage: 0, dateCount: 0 },
     priya: { affection: 0, stage: 0, dateCount: 0 },
+    lin:   { affection: 0, stage: 0, dateCount: 0 },
   },
   settings: { narrator: 'pro', sound: true },
   ageGateAccepted: false,
@@ -46,6 +47,7 @@ export function loadSave() {
         jada:  { ...DEFAULT.relationships.jada,  ...(p.relationships?.jada  || {}) },
         simone: { ...DEFAULT.relationships.simone, ...(p.relationships?.simone || {}) },
         priya: { ...DEFAULT.relationships.priya, ...(p.relationships?.priya || {}) },
+        lin:   { ...DEFAULT.relationships.lin,   ...(p.relationships?.lin   || {}) },
       },
     };
   } catch { return JSON.parse(JSON.stringify(DEFAULT)); }

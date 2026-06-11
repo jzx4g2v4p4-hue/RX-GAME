@@ -18,38 +18,247 @@ const btn = (bg, color, extra = {}) => ({
   letterSpacing: '0.2px', ...extra,
 });
 
-/* ---- Simple pixel portrait placeholder --------------------------------
-   SWAP POINT: replace the colored rectangle with an <img> tag pointing
-   to src/assets/portraits/<id>.png for each character.
-   -------------------------------------------------------------------- */
+/* ---- SVG bust portraits — one per character id ---- */
 function Portrait({ li, size = 88 }) {
+  const scale = size / 80;
+
+  function renderJada() {
+    /* Jada Westbrook — ER Nurse. Deep brown skin, natural puffy hair,
+       dark teal scrubs. Sardonic raised-eyebrow expression. */
+    return (
+      <>
+        <defs>
+          <radialGradient id="jada-bg" cx="50%" cy="40%" r="55%">
+            <stop offset="0%" stopColor="#3A5C4E" />
+            <stop offset="100%" stopColor="#1C3028" />
+          </radialGradient>
+        </defs>
+        {/* Background */}
+        <rect width={80} height={80} fill="url(#jada-bg)" />
+        {/* Shoulders / scrubs */}
+        <path d="M8 80 Q8 60 20 57 Q40 54 60 57 Q72 60 72 80 Z" fill="#234D44" />
+        {/* Neck */}
+        <rect x={34} y={50} width={12} height={10} rx={3} fill="#8B5E3C" />
+        {/* Face oval */}
+        <ellipse cx={40} cy={36} rx={16} ry={19} fill="#8B5E3C" />
+        {/* Natural puffy hair — wide rounded crown */}
+        <ellipse cx={40} cy={22} rx={20} ry={16} fill="#1A0A02" />
+        {/* Hair volume sides */}
+        <ellipse cx={24} cy={30} rx={8} ry={12} fill="#1A0A02" />
+        <ellipse cx={56} cy={30} rx={8} ry={12} fill="#1A0A02" />
+        {/* Ear left */}
+        <ellipse cx={24} cy={38} rx={3} ry={4} fill="#7A5030" />
+        {/* Ear right */}
+        <ellipse cx={56} cy={38} rx={3} ry={4} fill="#7A5030" />
+        {/* Left brow — raised slightly (sardonic) */}
+        <path d="M29 28 Q33 25 37 27" stroke="#0D0503" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        {/* Right brow — more raised */}
+        <path d="M43 26 Q47 23 51 26" stroke="#0D0503" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        {/* Left eye */}
+        <ellipse cx={33} cy={33} rx={3.5} ry={2.8} fill="#1A0808" />
+        <ellipse cx={33} cy={33} rx={2} ry={1.8} fill="#3B1A0A" />
+        <circle cx={34.2} cy={32.2} r={0.7} fill="white" opacity={0.85} />
+        {/* Right eye — slightly narrower, sardonic */}
+        <ellipse cx={47} cy={32.5} rx={3.2} ry={2.4} fill="#1A0808" />
+        <ellipse cx={47} cy={32.5} rx={1.8} ry={1.5} fill="#3B1A0A" />
+        <circle cx={48.1} cy={31.8} r={0.7} fill="white" opacity={0.85} />
+        {/* Nose suggestion */}
+        <path d="M38 37 Q40 40 42 37" stroke="#6A4020" strokeWidth={1} fill="none" strokeLinecap="round" />
+        {/* Mouth — slight asymmetric smirk */}
+        <path d="M33 44 Q38 47 45 43" stroke="#5A2A10" strokeWidth={1.6} fill="none" strokeLinecap="round" />
+        {/* Accent dot */}
+        <circle cx={72} cy={8} r={4} fill="#E2A552" opacity={0.9} />
+      </>
+    );
+  }
+
+  function renderSimone() {
+    /* Simone Okafor — Palliative NP. Medium warm brown skin, locs/braids,
+       amber earrings, plum professional attire. Calm, warm expression. */
+    return (
+      <>
+        <defs>
+          <radialGradient id="simone-bg" cx="50%" cy="35%" r="60%">
+            <stop offset="0%" stopColor="#3D2458" />
+            <stop offset="100%" stopColor="#1E0E2C" />
+          </radialGradient>
+        </defs>
+        {/* Background */}
+        <rect width={80} height={80} fill="url(#simone-bg)" />
+        {/* Shoulders / plum attire */}
+        <path d="M8 80 Q8 60 20 57 Q40 54 60 57 Q72 60 72 80 Z" fill="#3A2252" />
+        {/* Neck */}
+        <rect x={34} y={50} width={12} height={10} rx={3} fill="#7B4828" />
+        {/* Face oval */}
+        <ellipse cx={40} cy={36} rx={15} ry={18} fill="#7B4828" />
+        {/* Locs / braids — rope-like strands falling down sides */}
+        <rect x={22} y={14} width={36} height={14} rx={7} fill="#2A1A08" />
+        {/* Individual loc strands */}
+        <rect x={23} y={24} width={4} height={22} rx={2} fill="#2A1A08" />
+        <rect x={29} y={22} width={4} height={20} rx={2} fill="#2A1A08" />
+        <rect x={53} y={24} width={4} height={22} rx={2} fill="#2A1A08" />
+        <rect x={47} y={22} width={4} height={20} rx={2} fill="#2A1A08" />
+        {/* Top hair mass */}
+        <ellipse cx={40} cy={18} rx={18} ry={10} fill="#2A1A08" />
+        {/* Left amber earring */}
+        <circle cx={25} cy={40} r={2.5} fill="#C0781E" />
+        <circle cx={25} cy={40} r={1.2} fill="#E2A552" />
+        {/* Right amber earring */}
+        <circle cx={55} cy={40} r={2.5} fill="#C0781E" />
+        <circle cx={55} cy={40} r={1.2} fill="#E2A552" />
+        {/* Brows — gentle, even */}
+        <path d="M29 28 Q33 26 37 28" stroke="#180C04" strokeWidth={1.6} fill="none" strokeLinecap="round" />
+        <path d="M43 28 Q47 26 51 28" stroke="#180C04" strokeWidth={1.6} fill="none" strokeLinecap="round" />
+        {/* Left eye — open, warm */}
+        <ellipse cx={33} cy={33} rx={3.5} ry={3} fill="#18080A" />
+        <ellipse cx={33} cy={33} rx={2} ry={2} fill="#3C1C10" />
+        <circle cx={34.2} cy={32} r={0.8} fill="white" opacity={0.9} />
+        {/* Right eye */}
+        <ellipse cx={47} cy={33} rx={3.5} ry={3} fill="#18080A" />
+        <ellipse cx={47} cy={33} rx={2} ry={2} fill="#3C1C10" />
+        <circle cx={48.2} cy={32} r={0.8} fill="white" opacity={0.9} />
+        {/* Nose */}
+        <path d="M38 37.5 Q40 40.5 42 37.5" stroke="#5A3018" strokeWidth={1} fill="none" strokeLinecap="round" />
+        {/* Mouth — soft, calm smile */}
+        <path d="M33 44 Q40 48 47 44" stroke="#4A2010" strokeWidth={1.6} fill="none" strokeLinecap="round" />
+        {/* Accent dot */}
+        <circle cx={72} cy={8} r={4} fill="#C0781E" opacity={0.9} />
+      </>
+    );
+  }
+
+  function renderPriya() {
+    /* Priya Mehta — IM Resident. Warm tan South Asian skin, long straight
+       dark hair with side strands, dark navy/white coat. Sharp, tired, determined. */
+    return (
+      <>
+        <defs>
+          <radialGradient id="priya-bg" cx="50%" cy="35%" r="60%">
+            <stop offset="0%" stopColor="#5C3A6E" />
+            <stop offset="100%" stopColor="#2E1A3A" />
+          </radialGradient>
+        </defs>
+        {/* Background */}
+        <rect width={80} height={80} fill="url(#priya-bg)" />
+        {/* White coat suggestion over navy */}
+        <path d="M8 80 Q8 58 18 55 Q40 51 62 55 Q72 58 72 80 Z" fill="#2A3A5C" />
+        <path d="M8 80 Q8 60 16 57 L22 55 L22 80 Z" fill="#E8E0D0" opacity={0.9} />
+        <path d="M72 80 Q72 60 64 57 L58 55 L58 80 Z" fill="#E8E0D0" opacity={0.9} />
+        {/* Neck */}
+        <rect x={34} y={50} width={12} height={10} rx={3} fill="#C4895A" />
+        {/* Face oval */}
+        <ellipse cx={40} cy={35} rx={15} ry={18} fill="#C4895A" />
+        {/* Long straight hair — main mass at back */}
+        <rect x={22} y={8} width={36} height={50} rx={4} fill="#0A0806" />
+        {/* Hair top */}
+        <ellipse cx={40} cy={14} rx={17} ry={9} fill="#0A0806" />
+        {/* Side strands in front */}
+        <path d="M25 20 Q22 32 24 50" stroke="#0A0806" strokeWidth={4} fill="none" strokeLinecap="round" />
+        <path d="M55 20 Q58 32 56 50" stroke="#0A0806" strokeWidth={4} fill="none" strokeLinecap="round" />
+        {/* Brows — sharp, slight furrow */}
+        <path d="M28 27 Q32 24.5 37 26.5" stroke="#06040A" strokeWidth={2} fill="none" strokeLinecap="round" />
+        <path d="M43 26 Q48 24 52 26.5" stroke="#06040A" strokeWidth={2} fill="none" strokeLinecap="round" />
+        {/* Slight inner brow tension crease */}
+        <line x1={38} y1={26} x2={39} y2={28} stroke="#06040A" strokeWidth={0.8} opacity={0.6} />
+        {/* Left eye — slightly narrowed, tired but sharp */}
+        <ellipse cx={32.5} cy={32} rx={3.5} ry={2.5} fill="#100808" />
+        <ellipse cx={32.5} cy={32} rx={2} ry={1.6} fill="#2C1410" />
+        <circle cx={33.5} cy={31.3} r={0.7} fill="white" opacity={0.85} />
+        {/* Right eye */}
+        <ellipse cx={47.5} cy={32} rx={3.5} ry={2.5} fill="#100808" />
+        <ellipse cx={47.5} cy={32} rx={2} ry={1.6} fill="#2C1410" />
+        <circle cx={48.5} cy={31.3} r={0.7} fill="white" opacity={0.85} />
+        {/* Under-eye shadow (tired) */}
+        <path d="M29 34.5 Q32.5 35.5 36 34.5" stroke="#A06A3A" strokeWidth={0.8} fill="none" opacity={0.5} />
+        <path d="M44 34.5 Q47.5 35.5 51 34.5" stroke="#A06A3A" strokeWidth={0.8} fill="none" opacity={0.5} />
+        {/* Nose */}
+        <path d="M37.5 37 Q40 40 42.5 37" stroke="#9A6030" strokeWidth={1} fill="none" strokeLinecap="round" />
+        {/* Mouth — pressed, determined */}
+        <path d="M33 43.5 Q40 46 47 43.5" stroke="#8A3C18" strokeWidth={1.5} fill="none" strokeLinecap="round" />
+        {/* Accent dot */}
+        <circle cx={72} cy={8} r={4} fill="#C0781E" opacity={0.9} />
+      </>
+    );
+  }
+
+  function renderLin() {
+    /* Lin Nakamura — Clinical Pharmacist. East Asian lighter skin, neat dark
+       hair pulled back, navy clinical wear. Precise, half-smile expression. */
+    return (
+      <>
+        <defs>
+          <radialGradient id="lin-bg" cx="50%" cy="35%" r="60%">
+            <stop offset="0%" stopColor="#243C5C" />
+            <stop offset="100%" stopColor="#0E1E30" />
+          </radialGradient>
+        </defs>
+        {/* Background */}
+        <rect width={80} height={80} fill="url(#lin-bg)" />
+        {/* Navy clinical wear */}
+        <path d="M8 80 Q8 60 20 57 Q40 54 60 57 Q72 60 72 80 Z" fill="#1E3A5A" />
+        {/* Neck */}
+        <rect x={34} y={50} width={12} height={10} rx={3} fill="#D4A882" />
+        {/* Face oval — slightly more angular */}
+        <ellipse cx={40} cy={35} rx={15} ry={18} fill="#D4A882" />
+        {/* Hair pulled back — smooth flat top, small bun suggestion */}
+        <ellipse cx={40} cy={15} rx={17} ry={10} fill="#0A0806" />
+        {/* Bun at back-top */}
+        <ellipse cx={40} cy={10} rx={7} ry={5} fill="#0A0806" />
+        {/* Hair wraps sides smoothly down to ears */}
+        <path d="M23 15 Q21 24 23 35" stroke="#0A0806" strokeWidth={5} fill="none" strokeLinecap="round" />
+        <path d="M57 15 Q59 24 57 35" stroke="#0A0806" strokeWidth={5} fill="none" strokeLinecap="round" />
+        {/* Small stray strand for personality */}
+        <path d="M35 14 Q34 18 35 22" stroke="#0A0806" strokeWidth={1.2} fill="none" strokeLinecap="round" />
+        {/* Brows — clean, even, precise */}
+        <path d="M28.5 26 Q33 24.5 37 26" stroke="#08060A" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        <path d="M43 26 Q47 24.5 51.5 26" stroke="#08060A" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+        {/* Left eye — almond shape, attentive */}
+        <path d="M29 32 Q33 29 37 32 Q33 35 29 32 Z" fill="#140C0A" />
+        <ellipse cx={33} cy={32} rx={1.8} ry={1.8} fill="#2A1808" />
+        <circle cx={33.9} cy={31.2} r={0.7} fill="white" opacity={0.9} />
+        {/* Right eye */}
+        <path d="M43 32 Q47 29 51 32 Q47 35 43 32 Z" fill="#140C0A" />
+        <ellipse cx={47} cy={32} rx={1.8} ry={1.8} fill="#2A1808" />
+        <circle cx={47.9} cy={31.2} r={0.7} fill="white" opacity={0.9} />
+        {/* Nose — subtle */}
+        <path d="M38 36.5 Q40 39.5 42 36.5" stroke="#B88860" strokeWidth={0.9} fill="none" strokeLinecap="round" />
+        {/* Mouth — slight knowing half-smile, right corner up */}
+        <path d="M33 43 Q38 45.5 43 43" stroke="#9A6040" strokeWidth={1.5} fill="none" strokeLinecap="round" />
+        <path d="M43 43 Q46 42 47 41.5" stroke="#9A6040" strokeWidth={1.2} fill="none" strokeLinecap="round" />
+        {/* Accent dot */}
+        <circle cx={72} cy={8} r={4} fill="#7EB8C9" opacity={0.9} />
+      </>
+    );
+  }
+
+  function renderFallback() {
+    return (
+      <>
+        <rect width={80} height={80} fill={li.portraitBg} />
+        <circle cx={40} cy={40} r={24} fill={li.portraitAccent} opacity={0.6} />
+        <circle cx={40} cy={33} r={12} fill={li.portraitAccent} opacity={0.4} />
+      </>
+    );
+  }
+
+  function renderInner() {
+    switch (li.id) {
+      case 'jada':   return renderJada();
+      case 'simone': return renderSimone();
+      case 'priya':  return renderPriya();
+      case 'lin':    return renderLin();
+      default:       return renderFallback();
+    }
+  }
+
   return (
     <div style={{
       width: size, height: size, borderRadius: 14, overflow: 'hidden',
       background: li.portraitBg, border: `2px solid ${li.portraitAccent}`,
-      flexShrink: 0, display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', position: 'relative',
+      flexShrink: 0,
     }}>
-      {/* SWAP: <img src={`/src/assets/portraits/${li.id}.png`} alt={li.name}
-             style={{width:'100%',height:'100%',objectFit:'cover'}} /> */}
-      <svg width={size} height={size} viewBox="0 0 44 44" style={{ shapeRendering: 'crispEdges' }}>
-        {/* Background wash */}
-        <rect width={44} height={44} fill={li.portraitBg} />
-        {/* Body */}
-        <rect x={12} y={28} width={20} height={16} fill={li.portraitAccent} opacity={0.7} />
-        {/* Head */}
-        <rect x={15} y={14} width={14} height={14} fill="#f2e2c8" />
-        {/* Hair band — top 3 rows */}
-        <rect x={14} y={12} width={16} height={4} fill={li.portraitAccent} />
-        {/* Eyes */}
-        <rect x={18} y={19} width={2} height={2} fill={C.ink} />
-        <rect x={24} y={19} width={2} height={2} fill={C.ink} />
-        {/* Mouth */}
-        <rect x={20} y={24} width={4} height={1} fill={C.ink} opacity={0.5} />
-        {/* Neck */}
-        <rect x={20} y={28} width={4} height={3} fill="#f2e2c8" />
-        {/* Stage-glow accent dot */}
-        <circle cx={38} cy={6} r={4} fill={li.portraitAccent} />
+      <svg width={size} height={size} viewBox="0 0 80 80">
+        {renderInner()}
       </svg>
     </div>
   );
