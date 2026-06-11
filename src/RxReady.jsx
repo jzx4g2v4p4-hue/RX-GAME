@@ -132,7 +132,58 @@ const MODES = [
     desc: "Final product verification: the tech filled it — confirm they pulled the right stock, counted right, the pills in the vial match the reference, and the label's correct. Approve or reject.",
     icon: "⊙",
   },
+  {
+    id: 13,
+    title: "ManagerShift",
+    tag: "Queue Control",
+    desc: "Run the bench from a dashboard: verify data, watch production timers, handle drive-thru escalations, and finish with a CII safe audit.",
+    icon: "M",
+  },
+  {
+    id: 14,
+    title: "Career Mode",
+    tag: "Real Consequences",
+    desc: "Run full manager shifts across multiple days. Earn bonuses, eat penalties, chase promotions, and stay solvent.",
+    icon: "$",
+  },
 ];
+
+const MODE_GROUPS = [
+  {
+    id: "career",
+    title: "Full Shift",
+    tag: "POV Simulator",
+    lead: 14,
+    modes: [14, 13, 9],
+    desc: "Career, manager dashboard, pressure events, final checks, and the safe audit in one shift path.",
+  },
+  {
+    id: "verification",
+    title: "Verification Bench",
+    tag: "Pharmacist Work",
+    lead: 10,
+    modes: [11, 10, 5, 12],
+    desc: "Data entry, data verification, DUR review, and finished-product inspection.",
+  },
+  {
+    id: "workflow",
+    title: "Workflow Training",
+    tag: "Stations",
+    lead: 2,
+    modes: [2, 6, 7, 8],
+    desc: "Prescription entry practice, sig building, insurance rejections, and law cases.",
+  },
+  {
+    id: "knowledge",
+    title: "Knowledge Drills",
+    tag: "Practice",
+    lead: 1,
+    modes: [1, 4, 3],
+    desc: "Fast recall, drug mastery, OTC judgment, counseling, and counter conversations.",
+  },
+];
+
+const modeById = (id) => MODES.find((m) => m.id === id);
 
 /* ============================================================
    QUIZ BANK  (Mode 1)
@@ -395,6 +446,11 @@ const btn = (bg, color, extra = {}) => ({
   fontWeight: 600, fontSize: 16, cursor: "pointer", letterSpacing: "0.2px",
   ...extra,
 });
+
+const money = (value) => {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(value).toFixed(2)}`;
+};
 
 /* ============================================================
    APP
@@ -2389,6 +2445,22 @@ const VBENCH = [
     orig: { drug: "albuterol HFA", strength: "90 mcg", disp: "1 inhaler", sig: "2 puffs po q4-6h prn SOB", refills: "2", dob: "5/19/83", date: "5/11/25", patient: "Derek Foss", dawChecked: false },
     errorField: "directions", note: "The sig is TWO puffs every 4–6 hours as needed, but the directions were entered as ONE puff every 4 hours. Mistranslated dose and interval.",
   },
+  {
+    level: 4, patient: "Marta Chen", dob: "02/09/1957", age: "68", sex: "F", patientAddr: "52 Rowan St, Dayton, OH",
+    prescriber: "Iris Tan, MD", prescriberAddr: "9 Summit Ave, Dayton, OH",
+    brand: "Biaxin", generic: "clarithromycin", strength: "500 mg", manufacturer: "AbbVie",
+    writtenDate: "6/10/2026", qty: "14", refills: "0", daysSupply: "7", dawCode: "0",
+    directions: "take one tablet by mouth twice daily for 7 days",
+    orig: { drug: "clarithromycin", strength: "500 mg", disp: "14", sig: "1 tab po BID x7d", refills: "0", dob: "2/9/57", date: "6/10/26", patient: "Marta Chen", dawChecked: false },
+    errorField: null,
+    durOverride: {
+      code: "M01",
+      title: "Severe DUR interaction",
+      profile: "Active profile: simvastatin 40 mg nightly.",
+      detail: "Clarithromycin is a strong CYP3A4 inhibitor and can sharply raise simvastatin exposure, increasing myopathy/rhabdomyolysis risk.",
+    },
+    note: "The data entry matches the hard copy, but the clinical DUR lock requires documented pharmacist intervention. M01 records the manager override after the interaction is addressed.",
+  },
 ];
 
 const VFIELD_LABELS = { patient: "Patient name", dob: "Date of birth", prescriber: "Prescriber", brand: "Brand", drug: "Generic", strength: "Strength", qty: "Quantity", refills: "Refills", daysSupply: "Days supply", daw: "DAW code", directions: "Directions" };
@@ -2403,9 +2475,13 @@ function VerifyBench({ level, onFinish, onQuit }) {
   const [streak, setStreak] = useState(0);
   const [best, setBest] = useState(0);
   const [correct, setCorrect] = useState(0);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideCode, setOverrideCode] = useState("");
+  const [overrideError, setOverrideError] = useState("");
 
   if (!cases.length) return <Empty onQuit={onQuit} />;
   const c = cases[idx];
+  const overrideRequired = !!c.durOverride;
   const hand = { fontFamily: "'Caveat', cursive", fontSize: 19, color: "#2a2a33", lineHeight: 1.1 };
 
   function choose(key) {
@@ -2423,7 +2499,17 @@ function VerifyBench({ level, onFinish, onQuit }) {
       onFinish({ mode: 1, score, correct, total: cases.length, bestStreak: best, outOfLives: false });
       return;
     }
-    setIdx(idx + 1); setPick(undefined); setLocked(false);
+    setIdx(idx + 1); setPick(undefined); setLocked(false); setOverrideOpen(false); setOverrideCode(""); setOverrideError("");
+  }
+  function submitOverride() {
+    if (!overrideRequired || locked) return;
+    if (overrideCode.trim().toUpperCase() !== c.durOverride.code) {
+      setOverrideError("Code rejected. Enter the documented intervention code to release the DUR lock.");
+      return;
+    }
+    setOverrideOpen(false);
+    setOverrideError("");
+    choose("__verify__");
   }
 
   // a tappable entry field
@@ -2471,6 +2557,15 @@ function VerifyBench({ level, onFinish, onQuit }) {
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 12px", lineHeight: 1.5 }}>
         Compare the entry to the original. <strong style={{ color: C.ink }}>Tap the field that doesn't match</strong> — or verify if it's clean.
       </p>
+
+      {overrideRequired && (
+        <div className="rx-card pop" style={{ padding: 15, marginBottom: 12, border: `2px solid ${C.clay}`, background: "rgba(178,58,36,0.08)" }}>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.clay, marginBottom: 6 }}>DUR Lock</div>
+          <div style={{ fontWeight: 900, fontSize: 15.5, color: C.ink }}>{c.durOverride.title}</div>
+          <div style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.45, marginTop: 4 }}>{c.durOverride.profile}</div>
+          <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.45, marginTop: 4 }}>{c.durOverride.detail}</div>
+        </div>
+      )}
 
       {/* entry cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -2537,11 +2632,24 @@ function VerifyBench({ level, onFinish, onQuit }) {
       </div>
 
       {/* verify button */}
-      {!locked && (
+      {!locked && !overrideRequired && (
         <button onClick={() => choose("__verify__")}
           style={btn(C.green, "#fff", { width: "100%", marginTop: 14, background: C.green })}>
           ✓ Everything matches — Verify &amp; fill
         </button>
+      )}
+
+      {!locked && overrideRequired && (
+        <>
+          <button disabled
+            style={btn(C.paper2, C.muted, { width: "100%", marginTop: 14, border: `1px solid ${C.line}`, cursor: "not-allowed" })}>
+            Standard approve disabled - DUR intervention required
+          </button>
+          <button onClick={() => { setOverrideOpen(true); setOverrideCode(""); setOverrideError(""); }}
+            style={btn(C.clay, "#fff", { width: "100%", marginTop: 10, background: C.clay })}>
+            Manager Override
+          </button>
+        </>
       )}
 
       {locked && (
@@ -2561,6 +2669,37 @@ function VerifyBench({ level, onFinish, onQuit }) {
             {idx + 1 >= cases.length ? "Finish set" : "Next prescription →"}
           </button>
         </>
+      )}
+
+      {overrideOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(20,28,24,0.58)", display: "grid", placeItems: "center", padding: 18 }}>
+          <div className="rx-card pop" style={{ width: "min(480px, 100%)", padding: 20, border: `2px solid ${C.clay}`, background: C.card }}>
+            <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.clay, marginBottom: 8 }}>Locked manager override</div>
+            <div className="display" style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>Clinical DUR Intervention</div>
+            <p style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.5, color: C.muted }}>
+              Standard approval is blocked. Document the intervention, then enter the release code to force this Rx through.
+            </p>
+            <div className="rx-card" style={{ padding: 12, background: "rgba(178,58,36,0.07)", marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>{c.durOverride.title}</div>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{c.durOverride.detail}</div>
+            </div>
+            <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>Intervention code</div>
+            <input value={overrideCode} onChange={(e) => { setOverrideCode(e.target.value.toUpperCase()); setOverrideError(""); }}
+              placeholder="Type M01"
+              style={{ padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${overrideError ? C.clay : C.line}`, width: "100%", fontSize: 18, fontFamily: "'Spline Sans Mono', monospace", color: C.ink, background: C.card, outline: "none" }} />
+            {overrideError && <div style={{ color: C.clay, fontSize: 12.5, marginTop: 6 }}>{overrideError}</div>}
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={() => setOverrideOpen(false)}
+                style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, flex: 1 })}>
+                Cancel
+              </button>
+              <button onClick={submitOverride}
+                style={btn(C.clay, "#fff", { flex: 1, background: C.clay })}>
+                Force through
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2697,10 +2836,84 @@ const INTAKE = [
   },
 ];
 
+function intakeQueueCase(c, i) {
+  return {
+    ...c,
+    id: c.id || `intake-${i}-${c.orig.patient}-${c.orig.drug}`,
+    waiter: i === 0 || c.level >= 3,
+    source: c.source || "bank",
+  };
+}
+
+function emptyManualRx() {
+  return {
+    patient: "",
+    dob: "",
+    drug: "",
+    strength: "",
+    sig: "",
+    qty: "",
+    days: "",
+    refills: "0",
+    daw: "0",
+    prescriber: "",
+    position: "1",
+    waiter: true,
+  };
+}
+
+function manualDirConcepts(sig) {
+  const synonyms = {
+    "1": ["1", "one"],
+    "2": ["2", "two"],
+    "3": ["3", "three"],
+    "4": ["4", "four"],
+    tablet: ["tablet", "tab"],
+    capsule: ["capsule", "cap"],
+    ml: ["ml", "milliliter"],
+  };
+  return normSig(sig).trim().split(/\s+/).filter(Boolean).map((word) => synonyms[word] || [word]);
+}
+
+function makeManualIntakeCase(form, serial) {
+  const today = new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+  const patient = form.patient.trim() || "Manual Waiter";
+  const dob = form.dob.trim() || "1/1/80";
+  const drug = form.drug.trim() || "custom medication";
+  const strength = form.strength.trim() || "custom strength";
+  const sig = form.sig.trim() || "1 tab po daily";
+  const qty = form.qty.trim() || "30";
+  const days = form.days.trim() || "30";
+  const refills = form.refills.trim() || "0";
+  const daw = form.daw || "0";
+  const prescriber = form.prescriber.trim() || "Manager Added, MD";
+  const qtyLower = qty.toLowerCase();
+
+  return {
+    id: `manual-${Date.now()}-${serial}`,
+    level: 1,
+    manual: true,
+    waiter: !!form.waiter,
+    source: "manual",
+    drug,
+    strength,
+    prescriber,
+    prescriberAddr: "Manual queue insert",
+    orig: { patient, dob, date: today, drug, strength, disp: qty, sig, refills, dawChecked: daw === "1" },
+    ans: { qtyAccept: Array.from(new Set([qtyLower, qtyLower.replace(/\s+/g, "")])), days, refills, daw },
+    dirConcepts: manualDirConcepts(sig),
+    dirModel: expandSig(sig) || sig,
+    note: `Manual queue Rx for ${patient}. Match the custom hard copy values you inserted, then send it to verification.`,
+  };
+}
+
 /* ---------- Mode 11: Data Entry ---------- */
 function IntakeBench({ level, onFinish, onQuit }) {
-  const [cases] = useState(() => shuffle(INTAKE.filter((c) => c.level <= level)).slice(0, 7));
-  const [idx, setIdx] = useState(0);
+  const [queue, setQueue] = useState(() => shuffle(INTAKE.filter((c) => c.level <= level)).slice(0, 7).map(intakeQueueCase));
+  const [completed, setCompleted] = useState(0);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [manual, setManual] = useState(() => emptyManualRx());
+  const [manualSerial, setManualSerial] = useState(1);
   const [dir, setDir] = useState("");
   const [qty, setQty] = useState("");
   const [days, setDays] = useState("");
@@ -2712,8 +2925,8 @@ function IntakeBench({ level, onFinish, onQuit }) {
   const [best, setBest] = useState(0);
   const [correct, setCorrect] = useState(0);
 
-  if (!cases.length) return <Empty onQuit={onQuit} />;
-  const c = cases[idx];
+  if (!queue.length) return <Empty onQuit={onQuit} />;
+  const c = queue[0];
   const expanded = expandSig(dir);
   const hand = { fontFamily: "'Caveat', cursive", color: "#2a2a33", lineHeight: 1.1 };
   const checks = locked ? {
@@ -2725,6 +2938,38 @@ function IntakeBench({ level, onFinish, onQuit }) {
   } : null;
   const allOK = checks && Object.values(checks).every(Boolean);
   const canSubmit = dir.trim() && qty.trim() && days.trim() && refl.trim() && daw != null;
+  const totalInPlay = completed + queue.length;
+  const manualReady = manual.drug.trim() && manual.sig.trim() && manual.qty.trim() && manual.days.trim();
+
+  function resetEntry() {
+    setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null); setLocked(false);
+  }
+
+  function moveQueueItem(from, to) {
+    if (locked || from == null || to == null || from === to || from < 0 || to < 0) return;
+    setQueue((q) => {
+      if (from >= q.length || to >= q.length) return q;
+      const next = [...q];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    resetEntry();
+  }
+
+  function insertManualRx() {
+    if (!manualReady || locked) return;
+    const rx = makeManualIntakeCase(manual, manualSerial);
+    const pos = Math.max(0, Math.min(queue.length, Number(manual.position || 1) - 1));
+    setQueue((q) => {
+      const next = [...q];
+      next.splice(pos, 0, rx);
+      return next;
+    });
+    setManualSerial((n) => n + 1);
+    setManual(emptyManualRx());
+    resetEntry();
+  }
 
   function submit() {
     if (locked || !canSubmit) return;
@@ -2735,11 +2980,17 @@ function IntakeBench({ level, onFinish, onQuit }) {
     else setStreak(0);
   }
   function next() {
-    if (idx + 1 >= cases.length) { onFinish({ mode: 1, score, correct, total: cases.length, bestStreak: best, outOfLives: false }); return; }
-    setIdx(idx + 1); setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null); setLocked(false);
+    const nextCompleted = completed + 1;
+    if (queue.length <= 1) {
+      onFinish({ mode: 1, score, correct, total: nextCompleted, bestStreak: best, outOfLives: false });
+      return;
+    }
+    setCompleted(nextCompleted);
+    setQueue((q) => q.slice(1));
+    resetEntry();
   }
 
-  const inp = (bad) => ({ padding: "10px 12px", borderRadius: 10, fontSize: 15, width: "100%",
+  const inp = (bad) => ({ padding: "10px 12px", borderRadius: 10, fontSize: 15, width: "100%", minWidth: 0,
     border: `1.5px solid ${locked ? (bad ? C.clay : C.green) : C.line}`, background: C.card, color: C.ink,
     fontFamily: "'Spline Sans', sans-serif", outline: "none" });
   const NumField = ({ label, val, set, bad, correctVal }) => (
@@ -2757,13 +3008,103 @@ function IntakeBench({ level, onFinish, onQuit }) {
           <Stat label="Score" value={score} color={C.pine} />
           <Stat label="Streak" value={`×${streak}`} color={C.amber} />
         </div>
-        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Rx {idx + 1} / {cases.length}</span>
+        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Done {completed} / {totalInPlay}</span>
       </div>
-      <ProgressBar value={(idx / cases.length) * 100} />
+      <ProgressBar value={(completed / Math.max(totalInPlay, 1)) * 100} />
 
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 12px", lineHeight: 1.5 }}>
         Read the hard copy and <strong style={{ color: C.ink }}>key the prescription in</strong> — type the sig (shorthand is fine), enter the quantity, work out the days supply, and set refills and DAW.
       </p>
+
+      <div className="rx-card" style={{ padding: 16, marginBottom: 14, background: "rgba(31,74,63,0.04)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 10 }}>
+          <div>
+            <div className="display" style={{ fontSize: 17, fontWeight: 900 }}>Manual Queue Triage</div>
+            <div className="mono" style={{ fontSize: 11, color: C.muted }}>Drag cards to reprioritize. Slot 1 is the active Rx.</div>
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: C.amber }}>{queue.length} waiting</span>
+        </div>
+
+        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          {queue.map((rx, i) => (
+            <div key={rx.id}
+              draggable={!locked}
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => { moveQueueItem(dragIndex, i); setDragIndex(null); }}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                padding: "10px 12px", borderRadius: 11,
+                border: `1.5px solid ${i === 0 ? C.amber : C.line}`,
+                background: i === 0 ? "rgba(192,120,30,0.12)" : C.card,
+                cursor: locked ? "default" : "grab",
+              }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span className="mono" style={{ fontSize: 10, color: i === 0 ? C.amber : C.muted }}>#{i + 1}</span>
+                  {rx.waiter && <span className="mono" style={{ fontSize: 9.5, color: C.paper, background: C.clay, borderRadius: 20, padding: "2px 7px" }}>WAITER</span>}
+                  {rx.manual && <span className="mono" style={{ fontSize: 9.5, color: C.paper, background: C.pine, borderRadius: 20, padding: "2px 7px" }}>CUSTOM</span>}
+                  <strong style={{ fontSize: 13.5 }}>{rx.orig.patient}</strong>
+                </div>
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {rx.orig.drug} {rx.orig.strength} · {rx.orig.sig}
+                </div>
+              </div>
+              {i > 0 && !locked && (
+                <button onClick={() => moveQueueItem(i, 0)}
+                  style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "7px 10px", fontSize: 12, borderRadius: 9 })}>
+                  Rush
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 12 }}>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>Insert custom Rx</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr .7fr 1fr 1fr", gap: 8 }}>
+            <input value={manual.patient} onChange={(e) => setManual((m) => ({ ...m, patient: e.target.value }))} placeholder="Patient"
+              style={inp(false)} />
+            <input value={manual.dob} onChange={(e) => setManual((m) => ({ ...m, dob: e.target.value }))} placeholder="DOB"
+              style={inp(false)} />
+            <input value={manual.drug} onChange={(e) => setManual((m) => ({ ...m, drug: e.target.value }))} placeholder="Drug"
+              style={inp(false)} />
+            <input value={manual.strength} onChange={(e) => setManual((m) => ({ ...m, strength: e.target.value }))} placeholder="Strength"
+              style={inp(false)} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr .55fr .55fr .55fr .55fr", gap: 8, marginTop: 8 }}>
+            <input value={manual.sig} onChange={(e) => setManual((m) => ({ ...m, sig: e.target.value }))} placeholder="Sig, e.g. 1 tab po bid"
+              style={{ ...inp(false), fontFamily: "'Spline Sans Mono', monospace" }} />
+            <input value={manual.qty} onChange={(e) => setManual((m) => ({ ...m, qty: e.target.value }))} placeholder="Qty"
+              style={inp(false)} />
+            <input value={manual.days} onChange={(e) => setManual((m) => ({ ...m, days: e.target.value }))} placeholder="Days"
+              style={inp(false)} />
+            <input value={manual.refills} onChange={(e) => setManual((m) => ({ ...m, refills: e.target.value }))} placeholder="Refills"
+              style={inp(false)} />
+            <input type="number" min="1" max={queue.length + 1} value={manual.position}
+              onChange={(e) => setManual((m) => ({ ...m, position: e.target.value }))}
+              style={inp(false)} />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <select value={manual.daw} onChange={(e) => setManual((m) => ({ ...m, daw: e.target.value }))}
+              style={{ ...inp(false), flex: "0 0 150px" }}>
+              <option value="0">DAW 0</option>
+              <option value="1">DAW 1</option>
+              <option value="2">DAW 2</option>
+            </select>
+            <input value={manual.prescriber} onChange={(e) => setManual((m) => ({ ...m, prescriber: e.target.value }))} placeholder="Prescriber"
+              style={{ ...inp(false), flex: 1 }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: C.muted, whiteSpace: "nowrap" }}>
+              <input type="checkbox" checked={manual.waiter} onChange={(e) => setManual((m) => ({ ...m, waiter: e.target.checked }))} />
+              Waiter
+            </label>
+            <button onClick={insertManualRx} disabled={!manualReady || locked}
+              style={btn(C.pine, C.paper, { padding: "10px 14px", fontSize: 13, borderRadius: 10, opacity: manualReady && !locked ? 1 : 0.45 })}>
+              Insert
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* hard copy */}
       <div className="rx-card" style={{ padding: 0, overflow: "hidden", background: "#fffdf7", marginBottom: 14 }}>
@@ -2855,7 +3196,7 @@ function IntakeBench({ level, onFinish, onQuit }) {
         </button>
       ) : (
         <button onClick={next} style={btn(C.pine, C.paper, { width: "100%", marginTop: 12 })}>
-          {idx + 1 >= cases.length ? "Finish set" : "Next prescription →"}
+          {queue.length <= 1 ? "Finish set" : "Next prescription →"}
         </button>
       )}
     </div>
@@ -3211,6 +3552,897 @@ function FillCheck({ level, onFinish, onQuit }) {
   );
 }
 
+function managerRxFromFillCase(c, i) {
+  const lanes = ["Drive-thru", "Counter", "Waiter", "Phone"];
+  const patienceMs = 32000 + ((i * 11000) % 26000);
+  return {
+    id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
+    patient: c.rx.patient,
+    drug: c.rx.drug,
+    strength: c.rx.strength,
+    qty: c.rx.qty,
+    sig: c.rx.sig,
+    lane: lanes[i % lanes.length],
+    patienceMs,
+    patienceStartedAt: Date.now(),
+    deEscalated: false,
+    fillCase: c,
+  };
+}
+
+function isSevereFillError(rx) {
+  const fill = rx.fillCase?.fill;
+  const note = (rx.fillCase?.note || "").toLowerCase();
+  const ordered = (rx.fillCase?.rx?.drug || "").toLowerCase();
+  const filled = (fill?.stockDrug || "").toLowerCase();
+  return rx.fillCase?.errorField === "stock"
+    && (filled.includes("clonidine") || ordered.includes("clonazepam") || note.includes("sound-alike"));
+}
+
+function useDriveThruBell(enabled) {
+  const timerRef = useRef(null);
+  const visualRef = useRef(null);
+  const audioRef = useRef(null);
+  const enabledRef = useRef(enabled);
+  const [bellActive, setBellActive] = useState(false);
+  const [bellCount, setBellCount] = useState(0);
+
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+
+  function getAudio() {
+    if (typeof window === "undefined") return null;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+    if (!audioRef.current) {
+      const ctx = new AudioContext();
+      const master = ctx.createGain();
+      master.gain.value = 1;
+      master.connect(ctx.destination);
+      audioRef.current = { ctx, master };
+    }
+    return audioRef.current;
+  }
+
+  function playTone(audio, start, freq, length, loudness) {
+    const osc = audio.ctx.createOscillator();
+    const gain = audio.ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(freq, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(loudness, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    osc.connect(gain);
+    gain.connect(audio.master);
+    osc.start(start);
+    osc.stop(start + length + 0.03);
+  }
+
+  function ring(pattern = "drive-thru") {
+    if (!enabledRef.current && pattern !== "meltdown") return;
+    setBellActive(true);
+    setBellCount((n) => n + 1);
+    window.clearTimeout(visualRef.current);
+    visualRef.current = window.setTimeout(() => setBellActive(false), pattern === "meltdown" ? 6200 : 3200);
+
+    const audio = getAudio();
+    if (!audio) return;
+    if (audio.ctx.state === "suspended") audio.ctx.resume().catch(() => {});
+    const t = audio.ctx.currentTime + 0.02;
+    audio.master.gain.cancelScheduledValues(t);
+    audio.master.gain.setValueAtTime(1, t);
+    const hits = pattern === "meltdown"
+      ? [0, 0.13, 0.26, 0.52, 0.65, 0.78, 1.06, 1.19, 1.32]
+      : [0, 0.18, 0.36, 0.82, 1.0];
+    hits.forEach((offset, i) => {
+      const freq = pattern === "meltdown" ? (i % 2 ? 880 : 1240) : (i % 2 ? 740 : 980);
+      playTone(audio, t + offset, freq, pattern === "meltdown" ? 0.11 : 0.14, pattern === "meltdown" ? 0.24 : 0.16);
+    });
+  }
+
+  function silence() {
+    window.clearTimeout(timerRef.current);
+    window.clearTimeout(visualRef.current);
+    setBellActive(false);
+    const audio = audioRef.current;
+    if (audio) {
+      const t = audio.ctx.currentTime;
+      audio.master.gain.cancelScheduledValues(t);
+      audio.master.gain.setTargetAtTime(0.0001, t, 0.015);
+    }
+  }
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let alive = true;
+    const schedule = () => {
+      const wait = 45000 + Math.floor(Math.random() * 45001);
+      timerRef.current = window.setTimeout(() => {
+        if (!alive) return;
+        ring("drive-thru");
+        schedule();
+      }, wait);
+    };
+    schedule();
+    return () => {
+      alive = false;
+      window.clearTimeout(timerRef.current);
+    };
+  }, [enabled]);
+
+  useEffect(() => () => silence(), []);
+
+  return { bellActive, bellCount, ring, silence };
+}
+
+const SAFE_AUDIT_BOTTLES = [
+  {
+    drug: "Oxycodone IR",
+    strength: "5 mg",
+    ndc: "00406-0512",
+    expected: 120,
+    actual: 118,
+    pill: { color: "#ffffff", shape: "round", imprint: "K 18" },
+  },
+  {
+    drug: "Amphetamine salts",
+    strength: "20 mg",
+    ndc: "0555-0768",
+    expected: 90,
+    actual: 90,
+    pill: { color: "#f4a8a8", shape: "round", imprint: "AD 20" },
+  },
+  {
+    drug: "Methylphenidate ER",
+    strength: "36 mg",
+    ndc: "50458-0586",
+    expected: 60,
+    actual: 61,
+    pill: { color: "#b8d8f2", shape: "capsule", imprint: "ALZA 36" },
+  },
+  {
+    drug: "Hydromorphone",
+    strength: "2 mg",
+    ndc: "00406-3243",
+    expected: 100,
+    actual: 97,
+    pill: { color: "#f5f1df", shape: "round", imprint: "M 2" },
+  },
+];
+
+function SafeAudit({ onBalanced, summary }) {
+  const [entries, setEntries] = useState(() => SAFE_AUDIT_BOTTLES.map(() => ""));
+  const [attempts, setAttempts] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+
+  function parseVariance(value) {
+    const trimmed = value.trim();
+    if (!/^[+-]?\d+$/.test(trimmed)) return null;
+    return Number(trimmed);
+  }
+
+  const variances = SAFE_AUDIT_BOTTLES.map((b) => b.actual - b.expected);
+  const exact = entries.map((value, i) => parseVariance(value) === variances[i]);
+  const balanced = exact.every(Boolean);
+
+  function setEntry(i, value) {
+    setEntries((list) => list.map((item, idx) => (idx === i ? value : item)));
+  }
+
+  function submitAudit() {
+    const nextAttempts = attempts + 1;
+    setAttempts(nextAttempts);
+    setSubmitted(true);
+    if (balanced) onBalanced({ attempts: nextAttempts, varianceTotal: variances.reduce((sum, v) => sum + Math.abs(v), 0) });
+  }
+
+  function PhysicalCount({ bottle }) {
+    const tens = Math.floor(bottle.actual / 10);
+    const singles = bottle.actual % 10;
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center", marginTop: 10 }}>
+        {Array.from({ length: tens }).map((_, group) => (
+          <div key={`g-${group}`} title="10-count group" style={{
+            width: 30, height: 22, borderRadius: 5, border: "1px solid rgba(255,255,255,0.18)",
+            background: "rgba(0,0,0,0.16)", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 1.5, padding: 3,
+          }}>
+            {Array.from({ length: 10 }).map((__, dot) => (
+              <span key={dot} style={{ width: 3.5, height: 3.5, borderRadius: "50%", background: bottle.pill.color, boxShadow: "0 1px 2px rgba(0,0,0,0.35)" }} />
+            ))}
+          </div>
+        ))}
+        {Array.from({ length: singles }).map((_, i) => (
+          <Pill key={`s-${i}`} p={bottle.pill} size={14} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rise">
+      <div style={{
+        borderRadius: 18, padding: 18, color: "#f5f1df",
+        background: "linear-gradient(145deg, #2d3330, #111816 58%, #343b38)",
+        border: "3px solid rgba(255,255,255,0.18)",
+        boxShadow: "inset 0 0 0 2px rgba(0,0,0,0.42), 0 22px 46px -24px rgba(0,0,0,0.65)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14 }}>
+          <div>
+            <div className="pixel" style={{ fontSize: 10, color: C.amberSoft, marginBottom: 8 }}>CII SAFE AUDIT</div>
+            <div className="display" style={{ fontSize: 29, fontWeight: 900, lineHeight: 1 }}>Daily Finisher</div>
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: "#d7c9a9", textAlign: "right" }}>
+            Cleared {summary?.completed || 0}<br />Accuracy {summary?.completed ? Math.round((summary.correct / summary.completed) * 100) : 0}%
+          </div>
+        </div>
+
+        <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.22)", padding: 12, marginBottom: 14 }}>
+          <div className="mono" style={{ fontSize: 10, color: C.amberSoft, marginBottom: 6 }}>VAULT DOOR</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 7 }}>
+            {Array.from({ length: 24 }).map((_, i) => (
+              <span key={i} style={{ height: 9, borderRadius: 20, background: i % 3 === 0 ? "#d8c28e" : "#6f7772", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.45)" }} />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          {SAFE_AUDIT_BOTTLES.map((bottle, i) => {
+            const wrong = submitted && !exact[i];
+            return (
+              <div key={bottle.drug} style={{
+                borderRadius: 12, border: `1.5px solid ${wrong ? "#ff563f" : "rgba(255,255,255,0.18)"}`,
+                background: wrong ? "rgba(178,58,36,0.18)" : "rgba(255,255,255,0.06)", padding: 12,
+              }}>
+                <div style={{ display: "grid", gridTemplateColumns: "52px 1fr auto", gap: 12, alignItems: "center" }}>
+                  <div style={{ width: 46, height: 60, borderRadius: "7px 7px 9px 9px", background: "#a96019", position: "relative", boxShadow: "inset 0 -10px 18px rgba(0,0,0,0.22)" }}>
+                    <div style={{ position: "absolute", top: -7, left: 12, width: 22, height: 8, borderRadius: "3px 3px 1px 1px", background: "#6f4214" }} />
+                    <div style={{ position: "absolute", left: 6, right: 6, bottom: 8, minHeight: 25, borderRadius: 3, background: "#f6efe0", color: "#26332d", fontSize: 7.5, fontWeight: 800, display: "grid", placeItems: "center", textAlign: "center", padding: 2 }}>
+                      CII
+                    </div>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 900, fontSize: 14.5 }}>{bottle.drug} {bottle.strength}</div>
+                    <div className="mono" style={{ color: "#d7c9a9", fontSize: 10.5, marginTop: 3 }}>NDC {bottle.ndc}</div>
+                    <PhysicalCount bottle={bottle} />
+                  </div>
+                  <div style={{ minWidth: 95, textAlign: "right" }}>
+                    <div className="mono" style={{ color: C.amberSoft, fontSize: 9, marginBottom: 4 }}>EXPECTED</div>
+                    <div className="pixel" style={{ fontSize: 18, color: "#78f0a1", background: "#06130c", borderRadius: 6, padding: "8px 7px", boxShadow: "inset 0 0 8px rgba(120,240,161,0.18)" }}>{bottle.expected}</div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", marginTop: 11 }}>
+                  <label className="mono" style={{ color: "#d7c9a9", fontSize: 10.5 }}>Variance input: physical minus expected</label>
+                  <input
+                    value={entries[i]}
+                    onChange={(e) => setEntry(i, e.target.value)}
+                    inputMode="numeric"
+                    placeholder="+0"
+                    style={{
+                      width: 86, padding: "9px 10px", borderRadius: 8, border: `1px solid ${wrong ? "#ff563f" : "rgba(255,255,255,0.22)"}`,
+                      background: "#07100c", color: "#f5f1df", fontFamily: "'Spline Sans Mono', monospace", fontSize: 14, textAlign: "center",
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {submitted && !balanced && (
+          <div className="pop" style={{ marginTop: 13, padding: 12, borderRadius: 10, background: "rgba(178,58,36,0.22)", border: "1px solid #ff563f", fontWeight: 800 }}>
+            Audit variance still off. The safe stays open until every discrepancy balances.
+          </div>
+        )}
+
+        <button onClick={submitAudit} style={btn(balanced ? C.green : C.amber, "#fff", { width: "100%", marginTop: 14, background: balanced ? C.green : C.amber })}>
+          {balanced ? "Balance safe and close shift" : "Run safe audit"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ShiftReport({ report, hourlyRate, onContinue }) {
+  const basePay = hourlyRate * 8;
+  const totalBonuses = report.shiftBonuses || 0;
+  const totalPenalties = report.shiftPenalties || 0;
+  const penaltyCount = report.penaltyCount || 0;
+  const netProfit = basePay + totalBonuses - totalPenalties;
+  const rows = [
+    { label: "Base Pay", value: basePay, note: `${money(hourlyRate)} x 8 hours`, color: C.pine },
+    { label: "Total Bonuses", value: totalBonuses, note: "+$15 per clean verification", color: C.green },
+    { label: "Total Penalties", value: -totalPenalties, note: `${penaltyCount} malpractice hit${penaltyCount === 1 ? "" : "s"}`, color: totalPenalties ? C.clay : C.muted },
+    { label: "Net Profit", value: netProfit, note: "Deposited after continue", color: netProfit >= 0 ? C.green : C.clay },
+  ];
+
+  function continueReport() {
+    onContinue({
+      ...report,
+      basePay,
+      totalBonuses,
+      totalPenalties,
+      netProfit,
+      penaltyCount,
+      hourlyRate,
+    });
+  }
+
+  return (
+    <div className="rise">
+      <div className="rx-card" style={{
+        overflow: "hidden", borderRadius: 16, border: `2px solid ${netProfit >= 0 ? C.green : C.clay}`,
+        boxShadow: `0 22px 48px -26px ${netProfit >= 0 ? C.green : C.clay}`,
+      }}>
+        <div style={{ padding: 18, background: "#111816", color: "#f5f1df", borderBottom: `1px solid ${C.line}` }}>
+          <div className="pixel" style={{ fontSize: 10, color: C.amberSoft, marginBottom: 8 }}>DIGITAL SHIFT PAYSTUB</div>
+          <div className="display" style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>Manager Shift Report</div>
+          <div className="mono" style={{ color: "#d7c9a9", fontSize: 11, marginTop: 8 }}>
+            Final checks {report.completed || 0} / Accuracy {report.completed ? Math.round((report.correct / report.completed) * 100) : 0}% / Safe audit tries {report.auditAttempts || 1}
+          </div>
+        </div>
+
+        <div style={{ padding: 18, display: "grid", gap: 10 }}>
+          {rows.map((row) => (
+            <div key={row.label} style={{
+              display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center",
+              padding: "12px 0", borderBottom: row.label === "Net Profit" ? "none" : `1px solid ${C.line}`,
+            }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: row.label === "Net Profit" ? 17 : 14.5 }}>{row.label}</div>
+                <div className="mono" style={{ color: C.muted, fontSize: 10.5, marginTop: 3 }}>{row.note}</div>
+              </div>
+              <div className="display" style={{ fontSize: row.label === "Net Profit" ? 27 : 21, fontWeight: 900, color: row.color }}>
+                {money(row.value)}
+              </div>
+            </div>
+          ))}
+
+          {totalPenalties > 0 && (
+            <div className="pop" style={{ padding: 12, borderRadius: 12, background: "rgba(178,58,36,0.10)", border: `1px solid ${C.clay}` }}>
+              <div style={{ fontWeight: 900, color: C.clay, marginBottom: 4 }}>Malpractice Settlement Posted</div>
+              <div style={{ fontSize: 13.5, lineHeight: 1.45, color: C.ink }}>
+                A severe look-alike/sound-alike approval hit the shift ledger. Career Mode will subtract this from your bank.
+              </div>
+            </div>
+          )}
+
+          <button onClick={continueReport} style={btn(netProfit >= 0 ? C.pine : C.clay, "#fff", { width: "100%", marginTop: 4, background: netProfit >= 0 ? C.pine : C.clay })}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Mode 13: ManagerShift ---------- */
+function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQuit }) {
+  const [toVerifyData, setToVerifyData] = useState(() => shuffle(FILLCHECK.filter((c) => c.level <= level)).slice(0, 6).map(managerRxFromFillCase));
+  const [inProduction, setInProduction] = useState([]);
+  const [finalCheck, setFinalCheck] = useState([]);
+  const [completed, setCompleted] = useState(0);
+  const [correct, setCorrect] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [meltdown, setMeltdown] = useState(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [pendingSummary, setPendingSummary] = useState(null);
+  const [shiftReport, setShiftReport] = useState(null);
+  const [shiftBonuses, setShiftBonuses] = useState(0);
+  const [shiftPenalties, setShiftPenalties] = useState(0);
+  const [penaltyCount, setPenaltyCount] = useState(0);
+  const [malpracticeFlash, setMalpracticeFlash] = useState(null);
+  const timers = useRef({});
+  const pendingSummaryRef = useRef(null);
+  const bellPenaltyRef = useRef(0);
+  const malpracticeTimerRef = useRef(null);
+  const bell = useDriveThruBell(!auditOpen);
+
+  useEffect(() => () => {
+    Object.values(timers.current).forEach(clearTimeout);
+    window.clearTimeout(malpracticeTimerRef.current);
+  }, []);
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 350);
+    return () => clearInterval(tick);
+  }, []);
+
+  const total = completed + toVerifyData.length + inProduction.length + finalCheck.length;
+  const livePatients = [...toVerifyData, ...inProduction, ...finalCheck];
+
+  function patientLeftMs(rx) {
+    return Math.max(0, rx.patienceMs - (now - rx.patienceStartedAt));
+  }
+
+  function clearProductionTimers() {
+    Object.values(timers.current).forEach(clearTimeout);
+    timers.current = {};
+  }
+
+  function buildManagerSummary(done = completed, right = correct, bonuses = shiftBonuses, penalties = shiftPenalties, penaltyHits = penaltyCount) {
+    return {
+      mode: 13,
+      completed: done,
+      correct: right,
+      total: Math.max(done, total),
+      rating: done ? Math.round((right / done) * 100) : 0,
+      shiftBonuses: bonuses,
+      shiftPenalties: penalties,
+      penaltyCount: penaltyHits,
+    };
+  }
+
+  function startSafeAudit(done = completed, right = correct, bonuses = shiftBonuses, penalties = shiftPenalties, penaltyHits = penaltyCount) {
+    const summary = buildManagerSummary(done, right, bonuses, penalties, penaltyHits);
+    clearProductionTimers();
+    pendingSummaryRef.current = summary;
+    setPendingSummary(summary);
+    setMeltdown(null);
+    bell.silence();
+    setAuditOpen(true);
+  }
+
+  function finishAfterAudit(audit) {
+    const base = pendingSummaryRef.current || buildManagerSummary();
+    setAuditOpen(false);
+    setShiftReport({ ...base, auditBalanced: true, auditAttempts: audit.attempts, auditVarianceTotal: audit.varianceTotal });
+  }
+
+  function continueShiftReport(payload) {
+    if (onShiftComplete) {
+      onShiftComplete(payload);
+      return;
+    }
+    if (onFinish) onFinish(payload);
+  }
+
+  function resetPressureQueue(queue) {
+    const stamp = Date.now();
+    return queue.map((rx) => ({
+      ...rx,
+      patienceStartedAt: stamp,
+      patienceMs: Math.max(rx.patienceMs + 18000, 62000),
+      deEscalated: true,
+    }));
+  }
+
+  function wtfButton() {
+    bell.silence();
+    setMeltdown(null);
+    setNow(Date.now());
+    setToVerifyData((q) => resetPressureQueue(q));
+    setInProduction((q) => resetPressureQueue(q));
+    setFinalCheck((q) => resetPressureQueue(q));
+  }
+
+  useEffect(() => {
+    if (auditOpen || meltdown) return;
+    const angry = livePatients.find((rx) => patientLeftMs(rx) <= 0);
+    if (!angry) return;
+    setMeltdown({
+      patient: angry.patient,
+      drug: `${angry.drug} ${angry.strength}`,
+      lane: angry.lane,
+      at: Date.now(),
+    });
+    bell.ring("meltdown");
+  }, [now, toVerifyData, inProduction, finalCheck, auditOpen, meltdown]);
+
+  useEffect(() => {
+    if (auditOpen || bell.bellCount <= bellPenaltyRef.current) return;
+    bellPenaltyRef.current = bell.bellCount;
+    const squeeze = (queue) => queue.map((rx) => ({
+      ...rx,
+      patienceMs: Math.max(10000, rx.patienceMs - 3500),
+    }));
+    setToVerifyData((q) => squeeze(q));
+    setInProduction((q) => squeeze(q));
+    setFinalCheck((q) => squeeze(q));
+  }, [bell.bellCount, auditOpen]);
+
+  function approveData(rx) {
+    if (meltdown || auditOpen) return;
+    const etaMs = 5000 + Math.floor(Math.random() * 7001);
+    const ticket = { ...rx, etaMs, startedAt: Date.now(), readyAt: Date.now() + etaMs };
+    setToVerifyData((q) => q.filter((item) => item.id !== rx.id));
+    setInProduction((q) => [...q, ticket]);
+    timers.current[rx.id] = setTimeout(() => {
+      setInProduction((q) => q.filter((item) => item.id !== rx.id));
+      setFinalCheck((q) => [...q, { ...ticket, finishedAt: Date.now() }]);
+      delete timers.current[rx.id];
+    }, etaMs);
+  }
+
+  function finalAction(rx, action) {
+    if (meltdown || auditOpen) return;
+    const shouldApprove = rx.fillCase.errorField === null;
+    const ok = action === "approve" ? shouldApprove : !shouldApprove;
+    const malpractice = action === "approve" && !shouldApprove && isSevereFillError(rx);
+    const bonusGain = ok ? 15 : 0;
+    const penaltyGain = malpractice ? 500 : 0;
+    const nextCompleted = completed + 1;
+    const nextCorrect = correct + (ok ? 1 : 0);
+    const nextBonuses = shiftBonuses + bonusGain;
+    const nextPenalties = shiftPenalties + penaltyGain;
+    const nextPenaltyCount = penaltyCount + (malpractice ? 1 : 0);
+    const remaining = toVerifyData.length + inProduction.length + finalCheck.length - 1;
+    setFinalCheck((q) => q.filter((item) => item.id !== rx.id));
+    setCompleted(nextCompleted);
+    if (ok) setCorrect(nextCorrect);
+    if (bonusGain) setShiftBonuses(nextBonuses);
+    if (malpractice) {
+      setShiftPenalties(nextPenalties);
+      setPenaltyCount(nextPenaltyCount);
+      setMalpracticeFlash({ patient: rx.patient, drug: `${rx.drug} ${rx.strength}`, penalty: penaltyGain });
+      window.clearTimeout(malpracticeTimerRef.current);
+      malpracticeTimerRef.current = window.setTimeout(() => setMalpracticeFlash(null), 2200);
+    }
+    if (remaining <= 0) startSafeAudit(nextCompleted, nextCorrect, nextBonuses, nextPenalties, nextPenaltyCount);
+  }
+
+  const PressureMeter = ({ rx }) => {
+    const left = patientLeftMs(rx);
+    const pct = Math.max(0, Math.min(100, (left / rx.patienceMs) * 100));
+    const hot = pct <= 28;
+    const color = pct <= 20 ? C.clay : pct <= 45 ? C.amber : C.green;
+    return (
+      <div style={{ marginTop: 9 }}>
+        <div className="mono" style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9.5, color: hot ? C.clay : C.muted }}>
+          <span>{rx.lane}{rx.deEscalated ? " / recovered" : ""}</span>
+          <span>{left > 0 ? `${Math.ceil(left / 1000)}s patience` : "ZERO"}</span>
+        </div>
+        <div style={{ height: 6, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 5 }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .25s linear" }} />
+        </div>
+      </div>
+    );
+  };
+
+  const Column = ({ title, count, children }) => (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div className="display" style={{ fontSize: 18, fontWeight: 900 }}>{title}</div>
+        <span className="mono" style={{ fontSize: 11, color: C.amber }}>{count}</span>
+      </div>
+      <div style={{ display: "grid", gap: 10 }}>{children}</div>
+    </div>
+  );
+
+  const EmptyLane = ({ text }) => (
+    <div style={{ padding: 14, borderRadius: 12, border: `1px dashed ${C.line}`, color: C.muted, fontSize: 13.5, textAlign: "center" }}>{text}</div>
+  );
+
+  if (shiftReport) return <ShiftReport report={shiftReport} hourlyRate={hourlyRate} onContinue={continueShiftReport} />;
+  if (auditOpen) return <SafeAudit onBalanced={finishAfterAudit} summary={pendingSummary} />;
+
+  const hottest = livePatients.reduce((winner, rx) => {
+    if (!winner) return rx;
+    return patientLeftMs(rx) < patientLeftMs(winner) ? rx : winner;
+  }, null);
+
+  return (
+    <div className="rise">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 16 }}>
+          <Stat label="Cleared" value={completed} color={C.pine} />
+          <Stat label="Accuracy" value={completed ? `${Math.round((correct / completed) * 100)}%` : "-"} color={C.amber} />
+          <Stat label="Bonuses" value={money(shiftBonuses)} color={C.green} />
+          <Stat label="Penalties" value={money(shiftPenalties)} color={shiftPenalties ? C.clay : C.muted} />
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button onClick={wtfButton} style={btn(C.clay, "#fff", { padding: "9px 13px", fontSize: 13, borderRadius: 10, background: C.clay })}>
+            WTF Button
+          </button>
+          <button onClick={() => startSafeAudit()} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 13px", fontSize: 13 })}>
+            End shift / audit
+          </button>
+        </div>
+      </div>
+      <ProgressBar value={(completed / Math.max(total, 1)) * 100} />
+
+      <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 16px", lineHeight: 1.5 }}>
+        Manager dashboard: approve clean data entry, watch production, clear final product verification, and keep the waiting room from boiling over.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <div className={bell.bellActive ? "alarm-pulse" : ""} style={{
+          padding: 12, borderRadius: 12, border: `1px solid ${bell.bellActive ? C.clay : C.line}`,
+          background: bell.bellActive ? "rgba(178,58,36,0.12)" : C.card,
+        }}>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1, color: bell.bellActive ? C.clay : C.muted, textTransform: "uppercase" }}>
+            Drive-thru bell
+          </div>
+          <div className="display" style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+            {bell.bellActive ? "RINGING" : `${bell.bellCount} triggers`}
+          </div>
+        </div>
+        <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.line}`, background: C.card }}>
+          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1, color: C.muted, textTransform: "uppercase" }}>
+            Hottest patient
+          </div>
+          <div className="display" style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+            {hottest ? `${Math.ceil(patientLeftMs(hottest) / 1000)}s` : "Clear"}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+        <Column title="To Verify Data" count={toVerifyData.length}>
+          {!toVerifyData.length && <EmptyLane text="No data-entry scripts waiting." />}
+          {toVerifyData.map((rx) => (
+            <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
+              <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
+              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
+              <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Qty {rx.qty} · {rx.sig}</div>
+              <PressureMeter rx={rx} />
+              <button onClick={() => approveData(rx)}
+                style={btn(C.green, "#fff", { width: "100%", marginTop: 10, padding: "9px 12px", fontSize: 13, borderRadius: 10, background: C.green })}>
+                Approve data
+              </button>
+            </div>
+          ))}
+        </Column>
+
+        <Column title="In Production" count={inProduction.length}>
+          {!inProduction.length && <EmptyLane text="No tech fills running." />}
+          {inProduction.map((rx) => {
+            const remaining = Math.max(0, Math.ceil((rx.readyAt - now) / 1000));
+            const pct = Math.min(100, Math.max(0, ((rx.etaMs - Math.max(0, rx.readyAt - now)) / rx.etaMs) * 100));
+            return (
+              <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
+                <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
+                <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
+                <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 5 }}>Tech filling: {remaining}s</div>
+                <div style={{ height: 7, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 9 }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: C.amber, transition: "width .25s linear" }} />
+                </div>
+                <PressureMeter rx={rx} />
+              </div>
+            );
+          })}
+        </Column>
+
+        <Column title="Final Check" count={finalCheck.length}>
+          {!finalCheck.length && <EmptyLane text="No filled vials ready yet." />}
+          {finalCheck.map((rx) => {
+            const f = rx.fillCase.fill;
+            const needsReject = rx.fillCase.errorField !== null;
+            return (
+              <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <VialScatter p={f.pill} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
+                    <div style={{ color: C.muted, fontSize: 13.2 }}>{rx.drug} {rx.strength}</div>
+                    <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Shape: {f.pill.shape}</div>
+                    <div className="mono" style={{ color: C.muted, fontSize: 11 }}>Imprint: {f.pill.imprint}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(31,74,63,0.05)", fontSize: 12.5, color: C.muted }}>
+                  Stock: {f.stockDrug} {f.stockStrength} · Count {f.count}
+                </div>
+                <div className="mono" style={{ color: needsReject ? C.amber : C.muted, fontSize: 10.5, marginTop: 7 }}>Review stock, count, vial pills, and label before clearing.</div>
+                <PressureMeter rx={rx} />
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => finalAction(rx, "reject")}
+                    style={btn("transparent", C.clay, { border: `1px solid ${C.clay}`, flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10 })}>
+                    Reject
+                  </button>
+                  <button onClick={() => finalAction(rx, "approve")}
+                    style={btn(C.green, "#fff", { flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10, background: C.green })}>
+                    Approve
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </Column>
+      </div>
+
+      <button onClick={onQuit} style={btn("transparent", C.muted, { border: `1px solid ${C.line}`, width: "100%", marginTop: 14, fontSize: 13 })}>
+        Quit to home
+      </button>
+
+      {malpracticeFlash && (
+        <div className="malpractice-flash" style={{
+          position: "fixed", inset: 0, zIndex: 88, display: "grid", placeItems: "center", padding: 18,
+          background: "rgba(178,20,20,0.88)", color: "#fff", textAlign: "center", pointerEvents: "none",
+        }}>
+          <div style={{
+            width: "min(520px, 100%)", border: "4px solid #fff", borderRadius: 12, padding: 20,
+            background: "rgba(40,0,0,0.72)", boxShadow: "0 0 46px rgba(255,255,255,0.38)",
+          }}>
+            <div className="pixel" style={{ fontSize: 10, color: "#ffe1d8", marginBottom: 10 }}>MALPRACTICE SETTLEMENT</div>
+            <div className="display" style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{money(-malpracticeFlash.penalty)}</div>
+            <p style={{ margin: "12px auto 0", maxWidth: 380, lineHeight: 1.45 }}>
+              Severe verification failure on {malpracticeFlash.patient}: {malpracticeFlash.drug}.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {meltdown && (
+        <div className="alarm-pulse" style={{
+          position: "fixed", inset: 0, zIndex: 90, display: "grid", placeItems: "center", padding: 18,
+          background: "radial-gradient(circle at 50% 20%, rgba(255,77,48,0.98), rgba(128,0,0,0.96) 48%, rgba(38,0,0,0.98))",
+          color: "#fff", textAlign: "center",
+        }}>
+          <div style={{
+            width: "min(560px, 100%)", borderRadius: 14, padding: 22, border: "3px solid rgba(255,255,255,0.72)",
+            background: "rgba(30,0,0,0.58)", boxShadow: "0 24px 60px rgba(0,0,0,0.42)",
+          }}>
+            <div className="pixel" style={{ fontSize: 12, color: "#ffe1d8", marginBottom: 12 }}>PATIENT MELTDOWN</div>
+            <div className="display" style={{ fontSize: 40, fontWeight: 900, lineHeight: 1, marginBottom: 10 }}>SCREEN FROZEN</div>
+            <p style={{ margin: "0 auto 18px", maxWidth: 430, lineHeight: 1.45, fontSize: 15.5 }}>
+              {meltdown.patient} hit zero patience at {meltdown.lane} while waiting on {meltdown.drug}. Alarms stay live until the manager de-escalates.
+            </p>
+            <button onClick={wtfButton} style={btn("#fff", C.clay, { width: "100%", maxWidth: 330, fontSize: 17, fontWeight: 900 })}>
+              WTF Button
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CareerMode({ level, onQuit }) {
+  const [bankBalance, setBankBalance] = useState(1000);
+  const [hourlyRate, setHourlyRate] = useState(65);
+  const [dayCount, setDayCount] = useState(1);
+  const [consecutiveCleanShifts, setConsecutiveCleanShifts] = useState(0);
+  const [phase, setPhase] = useState("dashboard");
+  const [lastShift, setLastShift] = useState(null);
+  const [promotion, setPromotion] = useState(null);
+
+  function processShift(payload) {
+    const nextBank = bankBalance + payload.netProfit;
+    const clean = payload.penaltyCount === 0;
+    const nextClean = clean ? consecutiveCleanShifts + 1 : 0;
+    const nextDay = dayCount + 1;
+
+    setLastShift(payload);
+    setBankBalance(nextBank);
+    setDayCount(nextDay);
+
+    if (nextBank < 0) {
+      setConsecutiveCleanShifts(nextClean);
+      setPhase("terminated");
+      return;
+    }
+
+    if (clean && nextClean >= 3) {
+      const nextRate = hourlyRate + 5;
+      setHourlyRate(nextRate);
+      setConsecutiveCleanShifts(0);
+      setPromotion({ from: hourlyRate, to: nextRate, day: nextDay });
+      setPhase("promotion");
+      return;
+    }
+
+    setConsecutiveCleanShifts(nextClean);
+    setPhase("dashboard");
+  }
+
+  const HeaderStat = ({ label, value, color }) => (
+    <div style={{ minWidth: 112, padding: "10px 12px", borderRadius: 12, border: `1px solid ${C.line}`, background: "rgba(255,255,255,0.46)" }}>
+      <div className="display" style={{ fontSize: 20, fontWeight: 900, color: color || C.ink, lineHeight: 1 }}>{value}</div>
+      <div className="mono" style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{label}</div>
+    </div>
+  );
+
+  const careerHeader = (
+    <div className="rx-card" style={{ padding: 14, marginBottom: 14, position: "sticky", top: 8, zIndex: 40 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div>
+          <div className="pixel" style={{ fontSize: 10, color: C.amber, marginBottom: 6 }}>CAREER MODE</div>
+          <div className="display" style={{ fontSize: 25, fontWeight: 900, lineHeight: 1 }}>PIC Track</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <HeaderStat label="Bank" value={money(bankBalance)} color={bankBalance >= 0 ? C.green : C.clay} />
+          <HeaderStat label="Hourly" value={money(hourlyRate)} color={C.pine} />
+          <HeaderStat label="Day" value={dayCount} color={C.amber} />
+          <HeaderStat label="Clean" value={`${consecutiveCleanShifts}/3`} color={consecutiveCleanShifts >= 2 ? C.green : C.muted} />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (phase === "shift") {
+    return (
+      <div className="rise">
+        {careerHeader}
+        <ManagerShift
+          level={Math.max(level || 4, 4)}
+          hourlyRate={hourlyRate}
+          onShiftComplete={processShift}
+          onQuit={() => setPhase("dashboard")}
+        />
+      </div>
+    );
+  }
+
+  if (phase === "terminated") {
+    return (
+      <div className="rise">
+        {careerHeader}
+        <div className="malpractice-flash" style={{
+          borderRadius: 16, padding: 24, textAlign: "center", color: "#fff",
+          background: "radial-gradient(circle at 50% 20%, #f04435, #7a0505 58%, #220000)",
+          border: "4px solid rgba(255,255,255,0.82)", boxShadow: "0 24px 60px -24px rgba(178,58,36,0.9)",
+        }}>
+          <div className="pixel" style={{ fontSize: 12, color: "#ffe1d8", marginBottom: 14 }}>TERMINATED</div>
+          <div className="display" style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>Bankrupt</div>
+          <p style={{ maxWidth: 430, margin: "16px auto 0", lineHeight: 1.5 }}>
+            Your pharmacy career ledger dropped below zero after the last shift. The store has locked you out.
+          </p>
+          {lastShift && (
+            <div className="mono" style={{ marginTop: 16, fontSize: 12, color: "#ffe1d8" }}>
+              Last net: {money(lastShift.netProfit)} / Penalties: {money(lastShift.totalPenalties || 0)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "promotion" && promotion) {
+    return (
+      <div className="rise">
+        {careerHeader}
+        <div className="pop" style={{
+          borderRadius: 16, padding: 24, textAlign: "center", color: "#111816",
+          background: "linear-gradient(135deg, #ffe08a, #f2b441 42%, #fff5cc)",
+          border: "4px solid #fff", boxShadow: "0 26px 60px -24px rgba(192,120,30,0.95)",
+        }}>
+          <div className="pixel blink" style={{ fontSize: 12, color: C.clay, marginBottom: 14 }}>PROMOTION EARNED</div>
+          <div className="display" style={{ fontSize: 40, fontWeight: 900, lineHeight: 1 }}>Hourly Rate Up</div>
+          <p style={{ maxWidth: 450, margin: "16px auto 0", lineHeight: 1.5, fontWeight: 700 }}>
+            Three clean shifts in a row. Corporate bumped you from {money(promotion.from)} to {money(promotion.to)} per hour.
+          </p>
+          <button onClick={() => setPhase("dashboard")} style={btn(C.pine, "#fff", { marginTop: 20, minWidth: 220 })}>
+            Continue career
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rise">
+      {careerHeader}
+      <div className="rx-card" style={{ padding: 22, overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "absolute", right: -28, top: -24, fontSize: 126, opacity: 0.06, fontFamily: "'Fraunces',serif" }}>$</div>
+        <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: C.amber, textTransform: "uppercase", marginBottom: 10 }}>
+          Day {dayCount} / Manager Career
+        </div>
+        <div className="display" style={{ fontSize: 31, fontWeight: 900, lineHeight: 1.05, marginBottom: 10 }}>
+          Run the shift. Keep the job.
+        </div>
+        <p style={{ color: C.muted, lineHeight: 1.55, margin: "0 0 18px", maxWidth: 520 }}>
+          Each shift pays eight hours, rewards clean final checks, and punishes severe verification failures with malpractice settlements.
+          Three clean shifts in a row earns an automatic raise.
+        </p>
+
+        {lastShift && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 10, marginBottom: 18 }}>
+            <HeaderStat label="Last net" value={money(lastShift.netProfit)} color={lastShift.netProfit >= 0 ? C.green : C.clay} />
+            <HeaderStat label="Bonuses" value={money(lastShift.totalBonuses || 0)} color={C.green} />
+            <HeaderStat label="Penalties" value={money(lastShift.totalPenalties || 0)} color={lastShift.totalPenalties ? C.clay : C.muted} />
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={() => setPhase("shift")} style={btn(C.pine, "#fff", { flex: "1 1 220px", background: C.pine })}>
+            Start Shift
+          </button>
+          <button onClick={onQuit} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, flex: "0 1 150px" })}>
+            Exit career
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [screen, setScreen] = useState("home"); // home | setup | play | result | afterhours | settings
   const [mode, setMode] = useState(null);
@@ -3261,6 +4493,10 @@ export default function App() {
           background:radial-gradient(ellipse at center, transparent 58%, rgba(20,40,34,0.16)); }
         .blink { animation: blink 1.1s steps(2,start) infinite; }
         @keyframes blink { to { opacity:.3 } }
+        .alarm-pulse { animation: alarmPulse .46s steps(2,start) infinite; }
+        @keyframes alarmPulse { 50% { filter: brightness(1.28) saturate(1.2); transform: translateY(-1px); } }
+        .malpractice-flash { animation: malpracticeFlash .18s steps(2,start) 12; }
+        @keyframes malpracticeFlash { 50% { filter: invert(1) contrast(1.55) saturate(1.45); } }
       `}</style>
       <div className="crtv" /><div className="scan" />
 
@@ -3328,6 +4564,12 @@ export default function App() {
         {screen === "play" && mode === 12 && (
           <FillCheck level={level} onFinish={finish} onQuit={home} />
         )}
+        {screen === "play" && mode === 13 && (
+          <ManagerShift level={level} onFinish={finish} onQuit={home} />
+        )}
+        {screen === "play" && mode === 14 && (
+          <CareerMode level={level} onQuit={home} />
+        )}
         {screen === "result" && (
           <Result result={result} onAgain={() => setScreen("setup")} onHome={home} />
         )}
@@ -3382,16 +4624,16 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
 
       {/* HERO — The Shift = PLAY */}
       {(() => {
-        const shift = MODES.find((m) => m.id === 9);
+        const shift = modeById(14);
         return (
-          <button onClick={() => onPick(9)} className="lift"
+          <button onClick={() => onPick(14)} className="lift"
             style={{ width: "100%", textAlign: "left", cursor: "pointer", border: `2px solid ${C.amber}`, borderRadius: 18,
               padding: 22, marginBottom: 22, color: C.paper, position: "relative", overflow: "hidden",
               background: `linear-gradient(135deg, ${C.pine}, ${C.pineSoft})`,
               boxShadow: "0 18px 40px -20px rgba(31,74,63,0.8)" }}>
             <div style={{ position: "absolute", right: -20, top: -20, fontSize: 150, opacity: 0.08, fontFamily: "'Fraunces',serif" }}>℞</div>
             <div className="pixel" style={{ fontSize: 8, color: C.amberSoft, marginBottom: 12 }}>▶ STORY MODE</div>
-            <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>THE SHIFT</div>
+            <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>CAREER MODE</div>
             <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, opacity: 0.9, maxWidth: 460 }}>{shift.desc}</p>
             <div className="pixel blink" style={{ display: "inline-block", marginTop: 16, background: C.amber, color: C.paper, borderRadius: 6, padding: "10px 16px", fontSize: 11 }}>
               ▶ PRESS START
@@ -3401,7 +4643,56 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
       })()}
 
       <div className="pixel" style={{ fontSize: 10, color: C.pine, marginBottom: 14 }}>▸ STAGE SELECT</div>
-      <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
+        {MODE_GROUPS.map((group, gi) => (
+          <div key={group.id} className="rx-card lift" style={{ padding: 18, background: C.card }}>
+            <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 14 }}>
+              <button onClick={() => onPick(group.lead)}
+                style={{
+                  border: "none", cursor: "pointer", minWidth: 58, height: 58, borderRadius: 14,
+                  background: gi === 0 ? C.amber : C.pine, color: C.paper, display: "grid", placeItems: "center",
+                  fontSize: 25, fontFamily: "'Fraunces',serif", fontWeight: 900,
+                }}>
+                {String(gi + 1).padStart(2, "0")}
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span className="display" style={{ fontSize: 22, fontWeight: 900 }}>{group.title}</span>
+                  <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.amber, border: "1px solid " + C.amberSoft, borderRadius: 20, padding: "3px 9px" }}>{group.tag}</span>
+                </div>
+                <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 14.5, lineHeight: 1.5 }}>{group.desc}</p>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 9 }}>
+              {group.modes.map((id) => {
+                const m = modeById(id);
+                return (
+                  <button key={id} onClick={() => onPick(id)}
+                    style={{
+                      border: "1px solid " + (id === group.lead ? C.amberSoft : C.line),
+                      background: id === group.lead ? "rgba(192,120,30,0.10)" : C.paper,
+                      color: C.ink, borderRadius: 12, padding: "11px 12px", cursor: "pointer",
+                      display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 10, alignItems: "center", textAlign: "left",
+                    }}>
+                    <span style={{
+                      width: 34, height: 34, borderRadius: 10, background: id === group.lead ? C.amber : C.paper2,
+                      color: id === group.lead ? C.paper : C.pine, display: "grid", placeItems: "center",
+                      fontFamily: "'Fraunces',serif", fontWeight: 900, fontSize: 17,
+                    }}>{m.icon}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontWeight: 800, fontSize: 15.5 }}>{m.title}</span>
+                      <span style={{ display: "block", color: C.muted, fontSize: 12.5, lineHeight: 1.35 }}>{m.tag}</span>
+                    </span>
+                    <span style={{ color: C.amber, fontSize: 20, lineHeight: 1 }}>&gt;</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "none" }}>
         {MODES.filter((m) => m.id !== 9).map((m, i) => (
           <button key={m.id} className="rx-card lift" onClick={() => onPick(m.id)}
             style={{ textAlign: "left", padding: 20, cursor: "pointer", display: "flex", gap: 16, alignItems: "flex-start", background: C.card }}>
@@ -3566,7 +4857,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
           </div>
         </>
       )}
-      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12) && (
+      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12 || mode === 13 || mode === 14) && (
         <div className="rx-card" style={{ padding: 14, marginBottom: 22, fontSize: 13.5, color: C.muted }}>
           {mode === 5
             ? "Each case bundles the full verification workflow — DUR review, the safety alert, and your decision. Just set your difficulty."
@@ -3584,6 +4875,10 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
             ? "Read the hard copy and key the prescription in yourself — sig, quantity, days supply, refills, and DAW. Just set your difficulty."
             : mode === 12
             ? "Check the technician's completed fill against the order — stock, count, the pills in the vial, and the label. Just set your difficulty."
+            : mode === 13
+            ? "Run the manager loop: approve data verification, wait for the auto-tech production timers, then inspect final fills with vial visuals."
+            : mode === 14
+            ? "Career Mode wraps the manager loop in money, penalties, promotions, and bankruptcy. Career shifts force PIC-level cases."
             : "Each prescription in this mode naturally covers several skills — sig translation, math, error-catching, and counseling — so there's nothing to toggle. Just set your difficulty."}
         </div>
       )}
@@ -3623,7 +4918,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
         <button onClick={onBegin}
           disabled={blocked}
           style={btn(C.pine, C.paper, { flex: 1, opacity: blocked ? 0.4 : 1 })}>
-          {isMastery ? "Start set →" : mode === 9 ? "Clock in →" : "Start shift →"}
+          {isMastery ? "Start set →" : mode === 9 || mode === 13 || mode === 14 ? "Clock in →" : "Start shift →"}
         </button>
       </div>
     </div>
@@ -4022,6 +5317,18 @@ function Result({ result, onAgain, onHome }) {
       { label: "Claims worked", value: result.resolved },
       { label: "Correct calls", value: `${result.correct}/${result.total}` },
       { label: "Accuracy", value: pct + "%" },
+    ];
+  } else if (result.mode === 13) {
+    const pct = result.completed ? Math.round((result.correct / result.completed) * 100) : 0;
+    grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
+    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
+    line = pct >= 80
+      ? "Manager loop handled: data verified, production moved, final checks cleared, and the CII safe balanced."
+      : "Run the manager loop again and slow down at final check.";
+    stats = [
+      { label: "Final checks", value: result.completed },
+      { label: "Net", value: result.netProfit !== undefined ? money(result.netProfit) : `${result.correct}/${result.completed}` },
+      { label: "Penalties", value: result.totalPenalties !== undefined ? money(result.totalPenalties) : result.auditAttempts || 1 },
     ];
   } else {
     const r = result.rating;
