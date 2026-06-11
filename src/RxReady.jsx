@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import { loadSave, recordShiftResult, recordDrillResult, getRank, getStatLevel } from './afterhours/save.js';
+import { getQuip, NARRATOR_NAME, ZIPPO_GRID, ZIPPO_COLORS } from './afterhours/narrator.js';
+import AfterHours from './afterhours/AfterHours.jsx';
+import AgeGate from './afterhours/AgeGate.jsx';
+import Settings from './afterhours/Settings.jsx';
 
 /* ============================================================
    RxReady — Retail Pharmacy Bench Trainer
@@ -1962,7 +1967,7 @@ function PixelSprite({ grid, colors, px }) {
 const SHIFT_LEN = 150;
 const tagColor = (t) => t === "Safety" ? C.clay : t === "Insurance" ? C.amber : t === "VA Law" ? C.pineSoft : C.pine;
 
-function TheShift({ level, onHome, best, setBest }) {
+function TheShift({ level, onHome, best, setBest, onShiftEnd, narratorMode, speedBonus = 0, accuracyBonus = 0 }) {
   const poolRef = useRef(buildShiftPool(level));
   const idxRef = useRef(0);
   const idRef = useRef(1);
@@ -1989,12 +1994,14 @@ function TheShift({ level, onHome, best, setBest }) {
   const [gain, setGain] = useState(0);
   const [phase, setPhase] = useState("play");
   const [muted, setMuted] = useState(false);
+  const [narratorQuip, setNarratorQuip] = useState("");
 
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { repRef.current = rep; }, [rep]);
   useEffect(() => { _shiftMuted = muted; }, [muted]);
 
-  const decay = [0, 4, 5, 7, 9][level];
+  // Reduced decay (Speed stat perk: each level removes 0.4 patience/sec, max -4)
+  const decay = Math.max(1, [0, 4, 5, 7, 9][level] - Math.floor(speedBonus * 0.4));
   const spawnGap = () => { const base = [0, 8, 7, 6, 5][level]; const prog = (SHIFT_LEN - clock) / SHIFT_LEN; return Math.max(3, Math.round((base - prog * 3) + (Math.random() * 2 - 1))); };
 
   function endShift() { if (toRef.current) clearTimeout(toRef.current); setPhase("over"); }
@@ -2016,7 +2023,7 @@ function TheShift({ level, onHome, best, setBest }) {
             if (p.patience <= 0) { hit += 7; walk++; return false; }
             return true;
           });
-          if (walk > 0) { setRep((r) => Math.max(0, r - hit)); setCombo(0); setWalkouts((w) => w + walk); beep(120, 0.25, "sawtooth", 0.05); }
+          if (walk > 0) { setRep((r) => Math.max(0, r - hit)); setCombo(0); setWalkouts((w) => w + walk); setNarratorQuip(getQuip("walkout", narratorMode)); beep(120, 0.25, "sawtooth", 0.05); }
           return next;
         });
       }
@@ -2034,24 +2041,42 @@ function TheShift({ level, onHome, best, setBest }) {
     lockedRef.current = true; setLocked(true);
     setFeedback({ sel: i, correct, answer: active.task.answer, explain: active.task.explain });
     if (correct) {
-      const g = Math.round(12 * (1 + combo * 0.15));
+      // Accuracy stat perk: +$2 per level on base amount
+      const g = Math.round((12 + accuracyBonus * 2) * (1 + combo * 0.15));
       setCash((c) => c + g); setGain(g);
       setRep((r) => Math.min(100, r + 2)); setServed((s) => s + 1);
-      setCombo((c) => { const n = c + 1; setMaxCombo((m) => Math.max(m, n)); return n; });
+      setCombo((c) => {
+        const n = c + 1; setMaxCombo((m) => Math.max(m, n));
+        if (n >= 3) setNarratorQuip(getQuip("combo", narratorMode, { combo: n }));
+        else setNarratorQuip(getQuip("correct", narratorMode));
+        return n;
+      });
       beep(combo >= 4 ? 880 : 660, 0.12, "triangle", 0.06);
     } else {
       setRep((r) => Math.max(0, r - (active.task.danger ? 18 : 8)));
       setCombo(0); setErrors((e) => e + 1);
+      setNarratorQuip(getQuip("wrong", narratorMode));
       beep(160, 0.22, "sawtooth", 0.06);
     }
     toRef.current = setTimeout(() => {
       setQueue((q) => q.slice(1));
-      lockedRef.current = false; setLocked(false); setFeedback(null); setGain(0);
+      lockedRef.current = false; setLocked(false); setFeedback(null); setGain(0); setNarratorQuip("");
       if (repRef.current <= 0) endShift();
     }, 1300);
   }
 
+  // Fire payout callback once when shift ends
+  const shiftEndFiredRef = useRef(false);
+  useEffect(() => {
+    if (phase === "over" && onShiftEnd && !shiftEndFiredRef.current) {
+      shiftEndFiredRef.current = true;
+      // cash/served/errors/maxCombo are state — read via closure at render time
+      onShiftEnd({ cash, served, errors, maxCombo });
+    }
+  }, [phase]); // eslint-disable-line
+
   function reset() {
+    shiftEndFiredRef.current = false;
     poolRef.current = buildShiftPool(level); idxRef.current = 0; idRef.current = 1;
     spawnRef.current = 2; lockedRef.current = false; repRef.current = 100;
     if (toRef.current) clearTimeout(toRef.current);
@@ -2071,6 +2096,7 @@ function TheShift({ level, onHome, best, setBest }) {
     const newBest = score > (best || 0);
     if (newBest && setBest) setBest(score);
     const pulled = rep <= 0;
+    const shiftNarratorQuip = getQuip("shiftEnd", narratorMode, { good: !pulled && acc >= 70 });
     return (
       <div className="rise" style={{ textAlign: "center", paddingTop: 8 }}>
         <div className="pop" style={{ width: 108, height: 108, borderRadius: "50%", margin: "0 auto 14px",
@@ -2079,6 +2105,16 @@ function TheShift({ level, onHome, best, setBest }) {
         </div>
         <h2 className="display" style={{ fontSize: 26, fontWeight: 900, margin: "0 0 2px" }}>{pulled ? "Pulled off the floor" : "Shift complete"}</h2>
         <div className="mono" style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: C.amber, marginBottom: 6 }}>{rank}</div>
+        {/* Zippo quip */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 9, marginBottom: 10,
+          padding: "8px 14px", borderRadius: 12, background: "rgba(192,120,30,0.1)", border: `1px solid ${C.amberSoft}` }}>
+          <svg width={24} height={18} viewBox="0 0 10 11" style={{ shapeRendering: "crispEdges" }}>
+            {ZIPPO_GRID.map((row, r) => row.map((k, c) => (
+              k ? <rect key={`${r}-${c}`} x={c} y={r} width={1.05} height={1.05} fill={ZIPPO_COLORS[k]} /> : null
+            )))}
+          </svg>
+          <span style={{ fontSize: 12.5, fontStyle: "italic", color: C.ink }}>{shiftNarratorQuip}</span>
+        </div>
         <p style={{ color: C.muted, fontSize: 15, maxWidth: 440, margin: "0 auto 20px", lineHeight: 1.5 }}>
           {pulled ? "Your reputation bottomed out — too many errors or walkouts. Shake it off and run it back."
             : newBest ? "New personal best. The line never stood a chance." : "Nice work behind the counter. Beat your best next time."}
@@ -2203,6 +2239,23 @@ function TheShift({ level, onHome, best, setBest }) {
       ) : (
         <div className="rx-card" style={{ padding: 28, textAlign: "center", color: C.muted, fontStyle: "italic" }}>
           Counter's clear — next patient walking up…
+        </div>
+      )}
+
+      {/* Zippo narrator corner */}
+      {narratorQuip && (
+        <div className="pop" style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 10,
+          padding: "10px 14px", borderRadius: 12, background: "rgba(31,74,63,0.07)",
+          border: `1px dashed ${C.line}` }}>
+          <svg width={30} height={22} viewBox="0 0 10 11" style={{ shapeRendering: "crispEdges", flexShrink: 0, marginTop: 2 }}>
+            {ZIPPO_GRID.map((row, r) => row.map((k, c) => (
+              k ? <rect key={`${r}-${c}`} x={c} y={r} width={1.05} height={1.05} fill={ZIPPO_COLORS[k]} /> : null
+            )))}
+          </svg>
+          <div>
+            <span className="pixel" style={{ fontSize: 7, color: C.amber, display: "block", marginBottom: 3 }}>{NARRATOR_NAME}</span>
+            <span style={{ fontSize: 12, color: C.ink, fontStyle: "italic", lineHeight: 1.4 }}>{narratorQuip}</span>
+          </div>
         </div>
       )}
 
@@ -3159,7 +3212,7 @@ function FillCheck({ level, onFinish, onQuit }) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("home"); // home | setup | play | result
+  const [screen, setScreen] = useState("home"); // home | setup | play | result | afterhours | settings
   const [mode, setMode] = useState(null);
   const [skills, setSkills] = useState(SKILLS.map((s) => s.id));
   const [qtypes, setQtypes] = useState(QTYPES.map((q) => q.id));
@@ -3167,11 +3220,16 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [showRef, setShowRef] = useState(false);
   const [best, setBest] = useState(0);
+  const [save, setSave] = useState(() => loadSave());
 
   const startSetup = (m) => { setMode(m); setScreen("setup"); };
   const openReference = () => setScreen("reference");
   const begin = () => setScreen("play");
-  const finish = (res) => { setResult(res); setScreen("result"); };
+  const finish = (res) => {
+    setResult(res); setScreen("result");
+    const modeTag = mode === 8 ? 'law' : mode === 7 ? 'insurance' : mode === 3 ? 'counter' : mode === 2 ? 'fill' : 'general';
+    recordDrillResult({ correct: res.correct || 0, total: res.total || 0, modeTag, save, setSave });
+  };
   const home = () => { setScreen("home"); setMode(null); setResult(null); };
 
   return (
@@ -3206,11 +3264,20 @@ export default function App() {
       `}</style>
       <div className="crtv" /><div className="scan" />
 
+      {!save.ageGateAccepted && <AgeGate save={save} setSave={setSave} />}
+
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "26px 18px 80px" }}>
-        <Header onHome={home} show={screen !== "home"} />
+        <Header onHome={home} show={screen !== "home"} save={save} />
 
         {screen === "home" && (
-          <Home onPick={startSetup} onReference={openReference} showRef={showRef} setShowRef={setShowRef} />
+          <Home onPick={startSetup} onReference={openReference} showRef={showRef} setShowRef={setShowRef}
+            save={save} onAfterHours={() => setScreen("afterhours")} onSettings={() => setScreen("settings")} />
+        )}
+        {screen === "afterhours" && (
+          <AfterHours save={save} setSave={setSave} narratorMode={save.settings.narrator} onHome={home} />
+        )}
+        {screen === "settings" && (
+          <Settings save={save} setSave={setSave} onHome={home} />
         )}
         {screen === "reference" && <DrugReference onHome={home} />}
         {screen === "setup" && (
@@ -3245,7 +3312,12 @@ export default function App() {
           <VirginiaLaw level={level} onFinish={finish} onQuit={home} />
         )}
         {screen === "play" && mode === 9 && (
-          <TheShift level={level} onHome={home} best={best} setBest={setBest} />
+          <TheShift level={level} onHome={home} best={best} setBest={setBest}
+            onShiftEnd={(r) => recordShiftResult({ ...r, save, setSave })}
+            narratorMode={save.settings.narrator}
+            speedBonus={getStatLevel(save.stats.speed)}
+            accuracyBonus={getStatLevel(save.stats.accuracy)}
+          />
         )}
         {screen === "play" && mode === 10 && (
           <VerifyBench level={level} onFinish={finish} onQuit={home} />
@@ -3265,7 +3337,8 @@ export default function App() {
 }
 
 /* ---------- Header ---------- */
-function Header({ onHome, show }) {
+function Header({ onHome, show, save }) {
+  const rank = save ? getRank(save.lifetimeEarned) : null;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={onHome}>
@@ -3280,17 +3353,25 @@ function Header({ onHome, show }) {
           <div className="pixel" style={{ fontSize: 7, color: C.amber, marginTop: 5 }}>PHARMACY ARCADE</div>
         </div>
       </div>
-      {show && (
-        <button onClick={onHome} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 16px", fontSize: 14 })}>
-          ← Home
-        </button>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {save && (
+          <div style={{ textAlign: "right" }}>
+            <div className="display" style={{ fontSize: 16, fontWeight: 900, color: C.green, lineHeight: 1 }}>${save.currency}</div>
+            <div className="mono" style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.muted }}>{rank}</div>
+          </div>
+        )}
+        {show && (
+          <button onClick={onHome} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 16px", fontSize: 14 })}>
+            ← Home
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 /* ---------- Home ---------- */
-function Home({ onPick, onReference, showRef, setShowRef }) {
+function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, onSettings }) {
   const [showSched, setShowSched] = useState(false);
   return (
     <div className="rise">
@@ -3399,6 +3480,27 @@ function Home({ onPick, onReference, showRef, setShowRef }) {
           </p>
         </div>
       )}
+
+      {/* After Hours */}
+      <button onClick={onAfterHours} className="lift"
+        style={{ width: "100%", marginTop: 14, padding: "16px 18px", borderRadius: 16, cursor: "pointer",
+          background: `linear-gradient(135deg, #3A1A4A, #1F2A5A)`, color: C.paper,
+          border: `1px solid rgba(192,120,30,0.4)`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 22 }}>★</span>
+          <span style={{ textAlign: "left" }}>
+            <span className="pixel" style={{ fontSize: 10, display: "block", marginBottom: 4 }}>AFTER HOURS</span>
+            <span style={{ fontSize: 13, opacity: 0.85 }}>Life sim · dating · RPG stats · spend your shift earnings</span>
+          </span>
+        </span>
+        <span style={{ fontSize: 20, color: C.amber }}>›</span>
+      </button>
+
+      {/* Settings */}
+      <button onClick={onSettings}
+        style={btn("transparent", C.muted, { border: `1px dashed ${C.line}`, width: "100%", marginTop: 10, fontSize: 13 })}>
+        ⚙ Settings &amp; save
+      </button>
 
       <p style={{ marginTop: 22, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
         For training and study only — always follow your pharmacy's policies, current references,
