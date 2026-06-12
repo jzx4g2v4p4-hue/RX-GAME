@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { loadSave, recordShiftResult, recordDrillResult, getRank, getStatLevel } from './afterhours/save.js';
+import { loadSave, recordShiftResult, recordDrillResult, recordActivity, getRank, getStatLevel } from './afterhours/save.js';
 import { getQuip, NARRATOR_NAME, ZIPPO_GRID, ZIPPO_COLORS } from './afterhours/narrator.js';
 import AfterHours from './afterhours/AfterHours.jsx';
 import AgeGate from './afterhours/AgeGate.jsx';
@@ -5762,6 +5762,7 @@ export default function App() {
     setResult(res); setScreen("result");
     const modeTag = mode === 8 ? 'law' : mode === 7 ? 'insurance' : mode === 3 ? 'counter' : mode === 2 ? 'fill' : 'general';
     recordDrillResult({ correct: res.correct || 0, total: res.total || 0, modeTag, save, setSave });
+    recordActivity(mode, save, setSave);
   };
   const home = () => { setScreen("home"); setMode(null); setResult(null); };
 
@@ -5955,6 +5956,43 @@ function Header({ onHome, show, save }) {
   );
 }
 
+/* ---------- Home helpers ---------- */
+const MODE_TIME_EST = { 1:5, 2:10, 3:10, 4:5, 5:10, 6:5, 7:10, 8:10, 9:20, 10:10, 11:10, 12:10, 13:20, 14:25 };
+const DRILL_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12];
+
+function getRecommended(save) {
+  const lastPlayed = save?.lastPlayed || {};
+  const stats = save?.stats || {};
+  const lvl = (k) => Math.min(10, Math.floor((stats[k] || 0) / 40));
+  const now = Date.now();
+  const daysSince = (id) => {
+    if (!lastPlayed[id]) return 999;
+    return (now - new Date(lastPlayed[id]).getTime()) / 86400000;
+  };
+  const scored = DRILL_IDS.map((id) => {
+    let score = daysSince(id);
+    if (lvl('accuracy') < 3 && [5, 10, 12].includes(id)) score += 25;
+    if (lvl('law') < 3 && [7, 8].includes(id)) score += 25;
+    if (lvl('counseling') < 3 && [2, 3].includes(id)) score += 20;
+    if (lvl('speed') < 3 && [1].includes(id)) score += 15;
+    return { id, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 3).map((s) => s.id);
+}
+
+function wasPlayedToday(modeId, save) {
+  const lp = save?.lastPlayed?.[modeId];
+  if (!lp) return false;
+  return new Date(lp).toDateString() === new Date().toDateString();
+}
+
+function daysSinceMode(modeId, save) {
+  const lp = save?.lastPlayed?.[modeId];
+  if (!lp) return -1;
+  return Math.floor((Date.now() - new Date(lp).getTime()) / 86400000);
+}
+
 /* ---------- Home ---------- */
 const RPH_NAMES = ["R. Martinez, PharmD", "J. Thompson, PharmD", "K. Williams, PharmD", "M. Nguyen, PharmD", "A. Patel, PharmD", "S. Johnson, PharmD"];
 const STATION_DESCS = {
@@ -5965,6 +6003,7 @@ const STATION_DESCS = {
 };
 function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, onSettings }) {
   const [showSched, setShowSched] = useState(false);
+  const [showRef2, setShowRef2] = useState(false);
   const [liveClock, setLiveClock] = useState(() => new Date());
   const [termData] = useState(() => ({
     storeNum: Math.floor(Math.random() * 8000 + 1000),
@@ -5981,30 +6020,48 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
     const iv = setInterval(() => setLiveClock(new Date()), 1000);
     return () => clearInterval(iv);
   }, []);
+
+  const TM = { fontFamily: "'Spline Sans Mono',monospace" };
   const timeStr = liveClock.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
   const dayStr = liveClock.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
   const qColor = (n, lo, hi) => n >= hi ? "#FF4444" : n >= lo ? "#FFB800" : "#3FB950";
-  const T = { font: "'Spline Sans Mono',monospace" };
+
+  const recommended = getRecommended(save);
+  const doneToday = recommended.filter((id) => wasPlayedToday(id, save)).length;
+  const streak = save?.dailyStreak || 0;
+
+  const ModeTile = ({ id }) => {
+    const m = modeById(id);
+    const done = wasPlayedToday(id, save);
+    const days = daysSinceMode(id, save);
+    return (
+      <button onClick={() => onPick(id)} style={{ textAlign: "center", background: done ? "rgba(63,185,80,0.07)" : "#FFFFFF", border: `1px solid ${done ? "rgba(63,185,80,0.3)" : "#D0D8E0"}`, borderRadius: 9, padding: "10px 4px 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minHeight: 68 }}>
+        <span style={{ fontSize: 18, fontFamily: "'Fraunces',serif", lineHeight: 1, color: done ? "#3FB950" : "inherit" }}>{done ? "✓" : m.icon}</span>
+        <span style={{ ...TM, fontSize: 9, fontWeight: 600, color: done ? "#3FB950" : "#0B1F3A", lineHeight: 1.25, textAlign: "center" }}>{m.title}</span>
+        <span style={{ ...TM, fontSize: 7, color: "#8A9AAA", background: "#F2F5F7", borderRadius: 3, padding: "1px 5px" }}>
+          {days < 0 ? "new" : days === 0 ? "today" : `${days}d ago`} · ~{MODE_TIME_EST[id] || 10}m
+        </span>
+      </button>
+    );
+  };
   return (
     <div className="rise">
-      {/* ── RXPRO SYSTEM HEADER ── */}
-      <div style={{ borderRadius: "14px 14px 0 0", background: "#0B1F3A", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+      {/* ── RXPRO HEADER ── */}
+      <div style={{ borderRadius: "14px 14px 0 0", background: "#0B1F3A", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <div>
-          <div style={{ fontFamily: T.font, color: "#7EB8C9", fontSize: 8, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 }}>RXPRO PHARMACY SYSTEM v4.2</div>
-          <div style={{ fontFamily: T.font, color: "#E8F4F8", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.5 }}>STORE #{termData.storeNum}</div>
-          <div style={{ fontFamily: T.font, color: "#4A8FA5", fontSize: 10, marginTop: 2 }}>RPh ON DUTY: {termData.rph}</div>
+          <div style={{ ...TM, color: "#7EB8C9", fontSize: 8, letterSpacing: 2.5, marginBottom: 3 }}>RXPRO v4.2 · STORE #{termData.storeNum}</div>
+          <div style={{ ...TM, color: "#E8F4F8", fontSize: 12, fontWeight: 600 }}>RPh: {termData.rph}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontFamily: T.font, color: "#E8F4F8", fontSize: 14, fontWeight: 600, letterSpacing: 1 }}>{timeStr}</div>
-          <div style={{ fontFamily: T.font, color: "#4A8FA5", fontSize: 9, letterSpacing: 1, marginTop: 2 }}>{dayStr}</div>
+          <div style={{ ...TM, color: "#E8F4F8", fontSize: 13, fontWeight: 600, letterSpacing: 1 }}>{timeStr}</div>
+          <div style={{ ...TM, color: "#4A8FA5", fontSize: 9, letterSpacing: 1, marginTop: 1 }}>{dayStr}</div>
+          {streak > 0 && <div style={{ ...TM, color: "#FFB800", fontSize: 9, marginTop: 3 }}>🔥 {streak}-day streak</div>}
         </div>
       </div>
 
-      {/* ── PHARMACY FLOOR STATUS ── */}
-      <div style={{ background: "#0F2A3F", padding: "14px 18px 16px", marginBottom: 18, borderTop: "1px solid rgba(126,184,201,0.12)", borderRadius: "0 0 14px 14px" }}>
-        <div style={{ fontFamily: T.font, color: "#4A8FA5", fontSize: 8, letterSpacing: 2, marginBottom: 10 }}>▸ PHARMACY FLOOR STATUS</div>
-        {/* Queue station tiles */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 10 }}>
+      {/* ── FLOOR STATUS ── */}
+      <div style={{ background: "#0F2A3F", padding: "10px 18px 12px", marginBottom: 14, borderTop: "1px solid rgba(126,184,201,0.1)", borderRadius: "0 0 14px 14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr) 1.4fr", gap: 6 }}>
           {[
             { k: "QT",  v: termData.qt,  lo: 8,  hi: 14 },
             { k: "QV1", v: termData.qv1, lo: 4,  hi: 7  },
@@ -6013,172 +6070,147 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
           ].map(({ k, v, lo, hi }) => {
             const col = qColor(v, lo, hi);
             return (
-              <div key={k} style={{ background: "rgba(0,0,0,0.35)", borderRadius: 8, padding: "9px 6px 7px", textAlign: "center", border: `1px solid ${col}44` }}>
-                <div style={{ fontFamily: T.font, color: col, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{v}</div>
-                <div style={{ fontFamily: T.font, color: col, fontSize: 9, letterSpacing: 1, marginTop: 2 }}>{k}</div>
-                <div style={{ fontFamily: T.font, color: "#3A6070", fontSize: 7, marginTop: 1 }}>{STATION_DESCS[k]}</div>
+              <div key={k} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "7px 4px 5px", textAlign: "center" }}>
+                <div style={{ ...TM, color: col, fontSize: 19, fontWeight: 700, lineHeight: 1 }}>{v}</div>
+                <div style={{ ...TM, color: col, fontSize: 8, letterSpacing: 1, marginTop: 1 }}>{k}</div>
               </div>
             );
           })}
-        </div>
-        {/* Drive-thru / will-call / phones */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[
-            { label: "DRIVE-THRU", val: `${termData.drivethru} cars`, urgent: termData.drivethru >= 3 },
-            { label: "WILL-CALL",  val: `${termData.willcall} bags`, urgent: termData.willcall >= 22 },
-            { label: "PHONES",     val: termData.phones ? "RINGING" : "CLEAR", urgent: termData.phones, blink: termData.phones },
-          ].map(({ label, val, urgent, blink }) => (
-            <div key={label} style={{ flex: "1 1 90px", background: "rgba(0,0,0,0.3)", borderRadius: 8, padding: "7px 10px", display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontFamily: T.font, color: "#3A6070", fontSize: 7, letterSpacing: 1.5 }}>{label}</span>
-              <span className={blink ? "blink" : ""} style={{ fontFamily: T.font, color: urgent ? "#FF4444" : "#3FB950", fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{val}</span>
-            </div>
-          ))}
+          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "5px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
+            {[
+              { label: "DT", val: `${termData.drivethru}`, urgent: termData.drivethru >= 3 },
+              { label: "WC", val: `${termData.willcall}`, urgent: termData.willcall >= 22 },
+              { label: "PH", val: termData.phones ? "RING" : "OK", urgent: termData.phones, blink: termData.phones },
+            ].map(({ label, val, urgent, blink }) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ ...TM, color: "#3A6070", fontSize: 7 }}>{label}</span>
+                <span className={blink ? "blink" : ""} style={{ ...TM, color: urgent ? "#FF4444" : "#3FB950", fontSize: 9, fontWeight: 600 }}>{val}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* ── RANK CARD ── */}
       {save && save.shifts > 0 && (
-        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "12px 16px", marginBottom: 18, display: "flex", alignItems: "center", gap: 14, border: "1px solid rgba(63,185,80,0.2)" }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#143520", border: "1px solid rgba(63,185,80,0.3)", color: "#3FB950", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 20, fontWeight: 900, flexShrink: 0 }}>℞</div>
+        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(63,185,80,0.2)" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, background: "#143520", border: "1px solid rgba(63,185,80,0.3)", color: "#3FB950", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, flexShrink: 0 }}>℞</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontWeight: 600, fontSize: 12, color: "#E8F4F8", lineHeight: 1.2 }}>{getRank(save.lifetimeEarned)}</div>
-            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 9, color: "#4A8FA5", marginTop: 3, letterSpacing: 0.5 }}>
-              {save.shifts} SHIFT{save.shifts !== 1 ? "S" : ""} · ${save.lifetimeEarned} EARNED
-            </div>
+            <div style={{ ...TM, fontWeight: 600, fontSize: 11, color: "#E8F4F8" }}>{getRank(save.lifetimeEarned)}</div>
+            <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", marginTop: 2 }}>{save.shifts} shifts · ${save.lifetimeEarned} earned</div>
           </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 20, fontWeight: 700, color: "#3FB950", lineHeight: 1 }}>${save.currency}</div>
-            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 8, color: "#4A8FA5", marginTop: 3, letterSpacing: 1 }}>BALANCE</div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ ...TM, fontSize: 18, fontWeight: 700, color: "#3FB950", lineHeight: 1 }}>${save.currency}</div>
+            <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginTop: 2 }}>BALANCE</div>
           </div>
         </div>
       )}
 
-      {/* HERO — The Shift = CLOCK IN */}
-      <button onClick={() => onPick(14)} className="lift"
-        style={{ width: "100%", textAlign: "left", cursor: "pointer", border: "2px solid #3FB950", borderRadius: 14,
-          padding: 0, marginBottom: 22, color: "#E8F4F8", position: "relative", overflow: "hidden",
-          background: "#0B1F3A", boxShadow: "0 4px 24px -8px rgba(63,185,80,0.35)" }}>
-        <div style={{ background: "#143520", padding: "10px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(63,185,80,0.2)" }}>
-          <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#3FB950", fontSize: 9, letterSpacing: 2 }}>ACTION REQUIRED</span>
-          <span className="blink" style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#3FB950", fontSize: 9, letterSpacing: 2 }}>● STATION READY</span>
+      {/* ── TODAY'S TRAINING ── */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5 }}>▸ TODAY'S TRAINING</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            {[0,1,2].map((i) => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: 2, background: i < doneToday ? "#3FB950" : "rgba(255,255,255,0.12)" }} />
+            ))}
+            <span style={{ ...TM, color: doneToday === 3 ? "#3FB950" : "#4A8FA5", fontSize: 9, marginLeft: 4 }}>{doneToday}/3</span>
+          </div>
         </div>
-        <div style={{ padding: "18px 18px 20px" }}>
-          <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#7EB8C9", fontSize: 10, letterSpacing: 1.5, marginBottom: 6 }}>CAREER MODE — FULL SHIFT SIMULATION</div>
-          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 22, fontWeight: 900, color: "#E8F4F8", marginBottom: 10 }}>Clock In &amp; Run the Floor</div>
-          <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.55, color: "#7EB8C9", maxWidth: 460 }}>Full CVS retail pharmacy loop — QT intake, QV1 review, fill, QV2 final check, drive-thru, phones, pickups, waiters, and counseling.</p>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: "#3FB950", color: "#0B1F3A", borderRadius: 8, padding: "10px 18px" }}>
-            <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>▶ CLOCK IN — START FULL SHIFT</span>
+
+        {streak > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "6px 10px", background: "rgba(255,184,0,0.07)", borderRadius: 8, border: "1px solid rgba(255,184,0,0.18)" }}>
+            <span style={{ fontSize: 13 }}>🔥</span>
+            <span style={{ ...TM, color: "#FFB800", fontSize: 10, fontWeight: 700 }}>{streak}-day streak</span>
+            <span style={{ ...TM, color: "#8A9AAA", fontSize: 9 }}>{doneToday === 3 ? "All drills done!" : `${3 - doneToday} drill${3 - doneToday !== 1 ? "s" : ""} left today`}</span>
+          </div>
+        )}
+
+        {recommended.map((id) => {
+          const m = modeById(id);
+          const done = wasPlayedToday(id, save);
+          const days = daysSinceMode(id, save);
+          return (
+            <button key={id} onClick={() => onPick(id)} style={{ width: "100%", textAlign: "left", background: done ? "rgba(63,185,80,0.06)" : "#FFFFFF", border: `1px solid ${done ? "rgba(63,185,80,0.3)" : "#D0D8E0"}`, borderRadius: 10, padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, marginBottom: 7, boxShadow: done ? "none" : "0 1px 4px rgba(0,20,40,0.05)" }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: done ? "#143520" : "#F2F5F7", color: done ? "#3FB950" : "#0B1F3A", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 17, flexShrink: 0 }}>
+                {done ? "✓" : m.icon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...TM, fontSize: 11, fontWeight: 700, color: done ? "#3FB950" : "#0B1F3A" }}>{m.title}</div>
+                <div style={{ ...TM, fontSize: 9, color: done ? "#3FB950" : "#5A7080", marginTop: 2 }}>
+                  {done ? "✓ done today" : days < 0 ? "Never played — start here" : days === 0 ? "Played earlier today" : `Last played ${days}d ago`}
+                </div>
+              </div>
+              <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", background: "#F2F5F7", borderRadius: 4, padding: "3px 7px", flexShrink: 0 }}>~{MODE_TIME_EST[id] || 10}m</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── CLOCK IN HERO ── */}
+      <button onClick={() => onPick(14)} className="lift"
+        style={{ width: "100%", textAlign: "left", cursor: "pointer", border: "2px solid #3FB950", borderRadius: 12, padding: 0, marginBottom: 18, color: "#E8F4F8", overflow: "hidden", background: "#0B1F3A", boxShadow: "0 4px 24px -8px rgba(63,185,80,0.35)" }}>
+        <div style={{ background: "#143520", padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(63,185,80,0.2)" }}>
+          <span style={{ ...TM, color: "#3FB950", fontSize: 8, letterSpacing: 2 }}>CAREER MODE · FULL SHIFT</span>
+          <span className="blink" style={{ ...TM, color: "#3FB950", fontSize: 8, letterSpacing: 2 }}>● READY</span>
+        </div>
+        <div style={{ padding: "14px 16px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ background: "#3FB950", color: "#0B1F3A", borderRadius: 8, padding: "10px 14px", flexShrink: 0 }}>
+            <span style={{ ...TM, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>▶ CLOCK IN</span>
+          </div>
+          <div>
+            <div style={{ fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, color: "#E8F4F8", lineHeight: 1.1 }}>Run the Full CVS Floor</div>
+            <div style={{ ...TM, fontSize: 9, color: "#7EB8C9", marginTop: 4 }}>QT → QV1 → Fill → QV2 · Drive-thru · Phones · Pickups · ~25 min</div>
           </div>
         </div>
       </button>
 
-      {/* ── STATION SELECT ── */}
-      <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5, marginBottom: 12 }}>▸ SELECT TRAINING STATION</div>
-      <div style={{ display: "grid", gap: 12, marginBottom: 14 }}>
-        {MODE_GROUPS.map((group, gi) => {
-          const groupColors = ["#C0781E", "#1F4A3F", "#1A0808", "#2A1060"];
-          const groupAccents = ["#E2A552", "#3FB950", "#FF6B6B", "#A070FF"];
-          const gc = groupColors[gi] || "#1F4A3F";
-          const ga = groupAccents[gi] || "#7EB8C9";
-          return (
-            <div key={group.id} style={{ borderRadius: 14, overflow: "hidden", border: `1px solid ${ga}33` }}>
-              {/* Station header */}
-              <div style={{ background: gc, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => onPick(group.lead)}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: ga, fontSize: 20, fontWeight: 700, lineHeight: 1, minWidth: 32 }}>{String(gi + 1).padStart(2,"0")}</div>
-                  <div>
-                    <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#E8F4F8", fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{group.title}</div>
-                    <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: ga, fontSize: 8, letterSpacing: 1.5, marginTop: 2 }}>{group.tag}</div>
-                  </div>
-                </div>
-                <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: ga, fontSize: 18 }}>›</div>
-              </div>
-              {/* Mode rows */}
-              <div style={{ background: C.card }}>
-                {group.modes.map((id, mi) => {
-                  const m = modeById(id);
-                  const isLead = id === group.lead;
-                  return (
-                    <button key={id} onClick={() => onPick(id)}
-                      style={{
-                        width: "100%", textAlign: "left", border: "none",
-                        borderTop: mi === 0 ? "none" : `1px solid ${C.line}`,
-                        background: isLead ? `${ga}12` : "transparent",
-                        color: C.ink, padding: "11px 14px", cursor: "pointer",
-                        display: "grid", gridTemplateColumns: "32px 1fr auto", gap: 10, alignItems: "center",
-                      }}>
-                      <span style={{
-                        width: 32, height: 32, borderRadius: 9, background: isLead ? gc : C.paper2,
-                        color: isLead ? "#E8F4F8" : C.pine, display: "grid", placeItems: "center",
-                        fontFamily: "'Fraunces',serif", fontWeight: 900, fontSize: 16,
-                      }}>{m.icon}</span>
-                      <span style={{ minWidth: 0 }}>
-                        <span style={{ display: "block", fontWeight: 700, fontSize: 14.5, lineHeight: 1.2 }}>{m.title}</span>
-                        <span style={{ display: "block", color: C.muted, fontSize: 11.5, lineHeight: 1.3, marginTop: 1 }}>{m.tag}</span>
-                      </span>
-                      <span style={{ color: isLead ? ga : C.amber, fontSize: 18, lineHeight: 1 }}>›</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ display: "none" }}>
-        {MODES.filter((m) => m.id !== 9).map((m, i) => (
-          <button key={m.id} className="rx-card lift" onClick={() => onPick(m.id)}
-            style={{ textAlign: "left", padding: 20, cursor: "pointer", display: "flex", gap: 16, alignItems: "flex-start", background: C.card }}>
-            <div style={{ position: "relative", minWidth: 52, height: 52 }}>
-              <div style={{
-                width: 52, height: 52, borderRadius: 14, background: C.pine, color: C.paper,
-                display: "grid", placeItems: "center", fontSize: 26, fontFamily: "'Fraunces',serif",
-              }}>{m.icon}</div>
-              <div className="pixel" style={{ position: "absolute", top: -6, left: -6, fontSize: 7, background: C.amber, color: C.paper, borderRadius: 4, padding: "2px 4px" }}>{String(i + 1).padStart(2, "0")}</div>
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span className="display" style={{ fontSize: 21, fontWeight: 900 }}>{m.title}</span>
-                <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.amber, border: `1px solid ${C.amberSoft}`, borderRadius: 20, padding: "3px 9px" }}>{m.tag}</span>
-              </div>
-              <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 14.5, lineHeight: 1.5 }}>{m.desc}</p>
-            </div>
-          </button>
-        ))}
-      </div>
+      {/* ── ALL TRAINING STATIONS ── */}
+      <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5, marginBottom: 10 }}>▸ ALL TRAINING STATIONS</div>
 
-      {/* drug reference */}
-      <button onClick={onReference} className="lift"
-        style={{ width: "100%", marginTop: 4, padding: 0, borderRadius: 12, cursor: "pointer",
-          background: "#0B1F3A", color: "#E8F4F8", border: "1px solid rgba(126,184,201,0.25)", overflow: "hidden", textAlign: "left" }}>
-        <div style={{ background: "#0F2A3F", padding: "8px 16px", borderBottom: "1px solid rgba(126,184,201,0.1)", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#7EB8C9", fontSize: 8, letterSpacing: 2 }}>REFERENCE TERMINAL</span>
+      {[
+        { label: "VERIFICATION BENCH", ids: [11, 10, 5, 12] },
+        { label: "PRESCRIPTION SKILLS", ids: [4, 6, 2, 3] },
+        { label: "CLINICAL & LAW", ids: [1, 7, 8] },
+        { label: "SHIFT SIM", ids: [9, 13] },
+      ].map(({ label, ids }) => (
+        <div key={label} style={{ marginBottom: 12 }}>
+          <div style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 2, marginBottom: 6, paddingLeft: 2 }}>{label}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7 }}>
+            {ids.map((id) => <ModeTile key={id} id={id} />)}
+          </div>
         </div>
-        <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontFamily: "'Fraunces',serif", fontSize: 22 }}>℞</span>
+      ))}
+
+      {/* ── DRUG REFERENCE ── */}
+      <button onClick={onReference} className="lift"
+        style={{ width: "100%", marginTop: 4, padding: 0, borderRadius: 10, cursor: "pointer", background: "#0B1F3A", color: "#E8F4F8", border: "1px solid rgba(126,184,201,0.2)", overflow: "hidden", textAlign: "left" }}>
+        <div style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ ...TM, color: "#7EB8C9", fontSize: 18, lineHeight: 1 }}>℞</span>
             <span>
-              <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 13, fontWeight: 600, display: "block", color: "#E8F4F8" }}>Drug Reference</span>
-              <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 9, color: "#4A8FA5", marginTop: 2, display: "block" }}>Top-dispensed drugs · interactions · counseling</span>
+              <span style={{ ...TM, fontSize: 11, fontWeight: 600, display: "block", color: "#E8F4F8" }}>Drug Reference Terminal</span>
+              <span style={{ ...TM, fontSize: 8, color: "#4A8FA5", marginTop: 1, display: "block" }}>Top-dispensed drugs · interactions · counseling</span>
             </span>
           </span>
           <span style={{ color: "#7EB8C9", fontSize: 18 }}>›</span>
         </div>
       </button>
 
-      {/* quick reference */}
-      <button onClick={() => setShowRef(!showRef)}
-        style={btn("transparent", C.pine, { border: `1px dashed ${C.line}`, width: "100%", marginTop: 18, fontSize: 14 })}>
-        {showRef ? "Hide" : "Show"} quick sig-code cheat sheet
+      {/* quick sig ref */}
+      <button onClick={() => setShowRef2(!showRef2)}
+        style={{ ...TM, background: "transparent", color: "#4A8FA5", border: "1px dashed rgba(74,143,165,0.3)", borderRadius: 8, width: "100%", marginTop: 10, padding: "8px", fontSize: 10, cursor: "pointer", letterSpacing: 1 }}>
+        {showRef2 ? "▾" : "▸"} SIG CODE CHEAT SHEET
       </button>
-      {showRef && (
-        <div className="rx-card pop" style={{ padding: 18, marginTop: 12 }}>
-          <div className="mono" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px", fontSize: 13.5 }}>
-            {[["PO", "by mouth"], ["SL", "sublingual"], ["BID", "twice daily"], ["TID", "3× daily"],
-              ["QID", "4× daily"], ["PRN", "as needed"], ["HS", "at bedtime"], ["AC / PC", "before / after meals"],
-              ["q6h", "every 6 hours"], ["gtt", "drop(s)"], ["OD / OS / OU", "right / left / both eyes"],
-              ["AD / AS / AU", "right / left / both ears"], ["stat", "immediately"], ["tsp / tbsp", "5 mL / 15 mL"]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${C.line}`, paddingBottom: 4 }}>
-                <strong style={{ color: C.pine }}>{k}</strong><span style={{ color: C.muted }}>{v}</span>
+      {showRef2 && (
+        <div style={{ background: "#FFFFFF", border: "1px solid #D0D8E0", borderRadius: 8, padding: 14, marginTop: 6 }}>
+          <div style={{ ...TM, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px", fontSize: 11.5 }}>
+            {[["PO","by mouth"],["SL","sublingual"],["BID","twice daily"],["TID","3× daily"],
+              ["QID","4× daily"],["PRN","as needed"],["HS","at bedtime"],["AC / PC","before / after meals"],
+              ["q6h","every 6 hours"],["gtt","drop(s)"],["OD/OS/OU","R/L/both eyes"],
+              ["AD/AS/AU","R/L/both ears"],["stat","immediately"],["tsp/tbsp","5 mL / 15 mL"]].map(([k,v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #EEF1F4", paddingBottom: 4 }}>
+                <strong style={{ color: "#0B1F3A" }}>{k}</strong><span style={{ color: "#5A7080" }}>{v}</span>
               </div>
             ))}
           </div>

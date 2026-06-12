@@ -10,6 +10,9 @@ const DEFAULT = {
   lifetimeEarned: 0,
   stats: { speed: 0, accuracy: 0, counseling: 0, law: 0 },
   shifts: 0,
+  lastPlayed: {},
+  dailyStreak: 0,
+  lastActiveDate: "",
   relationships: {
     jada:  { affection: 0, stage: 0, dateCount: 0 },
     simone: { affection: 0, stage: 0, dateCount: 0 },
@@ -43,6 +46,7 @@ export function loadSave() {
       ...DEFAULT, ...p,
       stats: { ...DEFAULT.stats, ...(p.stats || {}) },
       settings: { ...DEFAULT.settings, ...(p.settings || {}) },
+      lastPlayed: { ...(p.lastPlayed || {}) },
       relationships: {
         jada:  { ...DEFAULT.relationships.jada,  ...(p.relationships?.jada  || {}) },
         simone: { ...DEFAULT.relationships.simone, ...(p.relationships?.simone || {}) },
@@ -141,4 +145,25 @@ export function acceptAgeGate(save, setSave) {
 export function resetSave(setSave) {
   const fresh = JSON.parse(JSON.stringify(DEFAULT));
   write(fresh); setSave(fresh); return fresh;
+}
+
+export function recordActivity(modeId, save, setSave) {
+  const today = new Date().toDateString();
+  const last = save.lastActiveDate || "";
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+  let streak = save.dailyStreak || 0;
+  if (last === today) {
+    // already active today — just update lastPlayed, no streak change
+  } else if (last === yesterday) {
+    streak += 1;
+  } else {
+    streak = 1;
+  }
+  const next = {
+    ...save,
+    lastPlayed: { ...save.lastPlayed, [modeId]: new Date().toISOString() },
+    dailyStreak: streak,
+    lastActiveDate: today,
+  };
+  write(next); setSave(next); return next;
 }
