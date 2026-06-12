@@ -4434,6 +4434,40 @@ function FillCheck({ level, onFinish, onQuit }) {
   );
 }
 
+function generateQv1Error(drug, strength, qty, sig, seedIndex) {
+  if (seedIndex % 5 >= 3) return null; // ~40% of scripts have a data-entry error
+  const slot = seedIndex % 3;
+  if (slot === 0) {
+    const map = {
+      "5 mg":"10 mg","10 mg":"20 mg","20 mg":"10 mg","25 mg":"50 mg","40 mg":"80 mg",
+      "50 mg":"25 mg","80 mg":"40 mg","100 mg":"50 mg","200 mg":"400 mg","500 mg":"1000 mg",
+      "0.5 mg":"1 mg","0.1 mg":"0.2 mg","25 mcg":"50 mcg","50 mcg":"100 mcg","100 mcg":"50 mcg",
+    };
+    const wrong = map[strength];
+    if (wrong) return { field: "strength", correct: strength, entered: wrong, label: "Strength" };
+  }
+  if (slot === 1) {
+    const qmap = { 14:28, 21:14, 28:14, 30:90, 60:30, 90:30, 100:30, 45:90, 180:90 };
+    const n = parseInt(qty);
+    const w = qmap[n];
+    if (w !== undefined) return { field: "quantity", correct: String(qty), entered: String(w), label: "Quantity" };
+  }
+  if (slot === 2) {
+    const pairs = [
+      [/once daily/i,"twice daily"],[/twice daily/i,"three times daily"],
+      [/three times daily/i,"twice daily"],[/every 6 hours/i,"every 8 hours"],
+      [/every 8 hours/i,"every 6 hours"],[/every 12 hours/i,"every 6 hours"],
+    ];
+    for (const [re, replacement] of pairs) {
+      if (re.test(sig)) {
+        const wrong = sig.replace(re, replacement);
+        if (wrong !== sig) return { field: "sig", correct: sig, entered: wrong, label: "Directions (Sig)" };
+      }
+    }
+  }
+  return null;
+}
+
 const CVS_PLANS = [
   "Caremark / CVS Health",
   "SilverScript (Part D)",
@@ -4453,6 +4487,7 @@ function managerRxFromFillCase(c, i, level = 4) {
   const spread = ((i * 11000) % 26000);
   const patienceMs = baseByLevel + spread;
   const rxNum = String(Math.floor(1000000 + ((i * 912347 + 5483921) % 8999999)));
+  const qv1Error = generateQv1Error(c.rx.drug, c.rx.strength, c.rx.qty, c.rx.sig, i);
   return {
     id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
     patient: c.rx.patient,
@@ -4468,6 +4503,8 @@ function managerRxFromFillCase(c, i, level = 4) {
     rxNum,
     insurancePlan: CVS_PLANS[i % CVS_PLANS.length],
     scriptType: SCRIPT_TYPES[i % SCRIPT_TYPES.length],
+    qv1Error,
+    daw: "0",
   };
 }
 
@@ -4996,13 +5033,16 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     return () => window.clearInterval(interval);
   }, [auditOpen, shiftReport, chainLoad]);
 
-  function approveData(rx) {
+  function approveData(rx, qv1Correct = true) {
     if (meltdown || auditOpen) return;
     const etaMs = 5000 + Math.floor(Math.random() * 7001);
     const ticket = { ...rx, etaMs, startedAt: Date.now(), readyAt: Date.now() + etaMs };
     setToVerifyData((q) => q.filter((item) => item.id !== rx.id));
     setInProduction((q) => [...q, ticket]);
-    addShiftXp(5, 1, "QV1 verified: +5 XP");
+    const caught = rx.qv1Error && qv1Correct;
+    const xp  = caught ? 10 : qv1Correct ? 5 : 0;
+    const svc = caught ?  3 : qv1Correct ? 1 : -6;
+    addShiftXp(xp, svc, caught ? "Error caught! +10 XP" : qv1Correct ? "QV1 clean: +5 XP" : "QV1 miss — service hit");
     timers.current[rx.id] = setTimeout(() => {
       setInProduction((q) => q.filter((item) => item.id !== rx.id));
       setFinalCheck((q) => [...q, { ...ticket, finishedAt: Date.now() }]);
@@ -5174,75 +5214,146 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       </div>
     );
 
-    if (vm.stage === "qv1") return (
-      <ModalWrap>
-        <ModalHeader title="DATA VERIFICATION" sub="QV1 — HARDCOPY REVIEW" />
+    if (vm.stage === "qv1") {
+      const qv1Error = rx.qv1Error || null;
+      const qv1Phase = vm.qv1Phase || "review";
+      const holdField = vm.holdField || null;
 
-        <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
-          <div style={{ background: "#0B1F3A", padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>℞ ORIGINAL PRESCRIPTION</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {rx.scriptType && <span style={{ ...TM, background: rx.scriptType === "eRx" ? "rgba(63,185,80,0.2)" : "rgba(126,184,201,0.2)", color: rx.scriptType === "eRx" ? "#3FB950" : "#7EB8C9", borderRadius: 3, padding: "1px 5px", fontSize: 7, fontWeight: 700 }}>{rx.scriptType}</span>}
-              <span style={{ ...TM, color: "#4A8FA5", fontSize: 8 }}>Rx#{rx.rxNum}</span>
-            </span>
+      const sysStrength = qv1Error?.field === "strength" ? qv1Error.entered : rx.strength;
+      const sysQty      = qv1Error?.field === "quantity" ? qv1Error.entered : String(rx.qty);
+      const sysSig      = qv1Error?.field === "sig"      ? qv1Error.entered : rx.sig;
+
+      const compareRows = [
+        { id: "drug",     label: "Drug",            hc: rx.drug,              sys: rx.drug },
+        { id: "strength", label: "Strength",        hc: rx.strength,          sys: sysStrength },
+        { id: "quantity", label: "Quantity",        hc: `#${rx.qty}`,         sys: `#${sysQty}` },
+        { id: "sig",      label: "Directions (Sig)", hc: rx.sig,              sys: sysSig },
+        { id: "daw",      label: "DAW",             hc: `DAW-${rx.daw||"0"}`, sys: `DAW-${rx.daw||"0"}` },
+        { id: "refills",  label: "Refills",         hc: String(refills),      sys: String(refills) },
+      ];
+
+      const FIELD_LABELS = ["Drug", "Strength", "Quantity", "Directions (Sig)", "DAW", "Refills"];
+      const labelToField = { "Drug":"drug","Strength":"strength","Quantity":"quantity","Directions (Sig)":"sig","DAW":"daw","Refills":"refills" };
+
+      const CompareTable = () => (
+        <div style={{ borderRadius: 7, overflow: "hidden", border: "1px solid #D0D8E0" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr", background: "#0B1F3A" }}>
+            <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", padding: "5px 8px", letterSpacing: 1 }}>FIELD</div>
+            <div style={{ ...TM, fontSize: 7, color: "#3FB950", padding: "5px 8px", letterSpacing: 1 }}>HARD COPY</div>
+            <div style={{ ...TM, fontSize: 7, color: "#7EB8C9", padding: "5px 8px", letterSpacing: 1, borderLeft: "1px solid rgba(255,255,255,0.1)" }}>SYSTEM ENTRY</div>
           </div>
-          <div style={{ padding: "10px 14px", borderBottom: "1px dashed #E0E8EF" }}>
-            <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 3 }}>PATIENT</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
-            <div style={{ ...TM, fontSize: 10, color: "#5A7080", marginTop: 2 }}>DOB: {dob}</div>
-          </div>
-          <div style={{ padding: "10px 14px", borderBottom: "1px dashed #E0E8EF" }}>
-            <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 3 }}>PRESCRIBER</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#0B1F3A" }}>{prescriber.name}</div>
-            <div style={{ ...TM, fontSize: 10, color: "#5A7080", marginTop: 2 }}>{prescriber.spec} · {prescriber.npi}</div>
-            <div style={{ ...TM, fontSize: 10, color: "#5A7080", marginTop: 1 }}>Ph: {prescriber.phone} · Written: {scriptWrittenDate}</div>
-          </div>
-          <div style={{ padding: "10px 14px" }}>
-            <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 5 }}>℞ PRESCRIBED</div>
-            <div style={{ fontSize: 19, fontWeight: 800, color: "#0B1F3A", lineHeight: 1.1 }}>{rx.drug}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A4060", marginTop: 2 }}>{rx.strength}</div>
-            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-              {[["DISPENSE", `#${rx.qty}`], ["REFILLS", String(refills)], ["ROUTE", "PO"]].map(([k, v]) => (
-                <div key={k} style={{ background: "#F2F5F7", borderRadius: 6, padding: "6px 8px" }}>
-                  <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1 }}>{k}</div>
-                  <div style={{ ...TM, fontSize: 13, fontWeight: 700, color: "#0B1F3A", marginTop: 2 }}>{v}</div>
-                </div>
-              ))}
+          {compareRows.map(({ id, label, hc, sys }, idx) => (
+            <div key={id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr", borderTop: "1px solid #EEF1F4" }}>
+              <div style={{ ...TM, fontSize: 8, color: "#5A7080", padding: "7px 8px", background: "#F8FAFB" }}>{label}</div>
+              <div style={{ ...TM, fontSize: id==="sig"?8.5:10, color: "#0B4030", padding: "7px 8px", background: "#F2FBF6", fontWeight: 600, lineHeight: 1.35, borderLeft: "1px solid #EEF1F4" }}>{hc}</div>
+              <div style={{ ...TM, fontSize: id==="sig"?8.5:10, color: "#1A3060", padding: "7px 8px", background: "#F2F5FB", fontWeight: 600, lineHeight: 1.35, borderLeft: "1px solid #EEF1F4" }}>{sys}</div>
             </div>
-            <div style={{ marginTop: 8, background: "#F2F5F7", borderRadius: 6, padding: "7px 10px" }}>
-              <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1, marginBottom: 3 }}>DIRECTIONS (SIG)</div>
-              <div style={{ ...TM, fontSize: 12, fontWeight: 600, color: "#0B1F3A", lineHeight: 1.4 }}>{rx.sig.toUpperCase()}</div>
-            </div>
-          </div>
+          ))}
         </div>
+      );
 
-        <div style={{ background: "#FFFFFF", margin: "8px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
-          <div style={{ background: "#F2F5F7", padding: "6px 12px", borderBottom: "1px solid #D0D8E0" }}>
-            <span style={{ ...TM, fontSize: 9, color: "#5A7080", letterSpacing: 1.5 }}>SYSTEM ENTRY — VERIFY MATCH</span>
-          </div>
-          <div style={{ padding: "4px 12px 8px" }}>
-            {[["Drug / Strength", `${rx.drug} ${rx.strength}`], ["Quantity", `#${rx.qty}`], ["Sig", rx.sig]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F0F4F7" }}>
-                <span style={{ ...TM, fontSize: 9, color: "#5A7080", letterSpacing: 1 }}>{k}</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ ...TM, fontSize: 10, color: "#1A2A35", fontWeight: 600 }}>{v}</span>
-                  <span style={{ ...TM, color: "#3FB950", fontSize: 11 }}>✓</span>
-                </span>
+      if (qv1Phase === "review") return (
+        <ModalWrap>
+          <ModalHeader title="DATA VERIFICATION" sub="QV1 — COMPARE ENTRIES" />
+          <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", padding: "10px 14px 12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingBottom: 10, marginBottom: 10, borderBottom: "1px dashed #E0E8EF" }}>
+              <div>
+                <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PATIENT</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
+                <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>DOB: {dob}</div>
               </div>
+              <div>
+                <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PRESCRIBER</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#0B1F3A" }}>{prescriber.name}</div>
+                <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{prescriber.spec} · {prescriber.npi}</div>
+              </div>
+            </div>
+            <div style={{ ...TM, fontSize: 8, color: "#CC0000", letterSpacing: 1.5, marginBottom: 8, fontWeight: 700 }}>
+              COMPARE HARD COPY ↔ SYSTEM ENTRY — FIND ANY MISMATCH
+            </div>
+            <CompareTable />
+          </div>
+          <div style={{ padding: "10px 12px 16px", display: "grid", gap: 8 }}>
+            <button onClick={() => { approveData(rx, !qv1Error); onClose(); }}
+              style={{ ...TM, padding: "13px 0", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>
+              ✓ APPROVE — ENTRIES MATCH
+            </button>
+            <button onClick={() => setVerifyModal(v => ({ ...v, qv1Phase: "holdPick", holdField: null }))}
+              style={{ ...TM, padding: "11px 0", background: "rgba(204,0,0,0.06)", color: "#CC0000", border: "1px solid rgba(204,0,0,0.3)", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              ⚠ HOLD — I FOUND A DISCREPANCY
+            </button>
+          </div>
+        </ModalWrap>
+      );
+
+      if (qv1Phase === "holdPick") return (
+        <ModalWrap>
+          <ModalHeader title="DATA VERIFICATION" sub="QV1 — FLAG THE ERROR" />
+          <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", padding: "14px" }}>
+            <div style={{ ...TM, fontSize: 10, color: "#0B1F3A", marginBottom: 12, fontWeight: 600, lineHeight: 1.4 }}>
+              Which field has a mismatch between the hard copy and the system entry?
+            </div>
+            {FIELD_LABELS.map((opt) => (
+              <button key={opt} onClick={() => setVerifyModal(v => ({ ...v, holdField: opt }))}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", marginBottom: 6, background: holdField === opt ? "rgba(204,0,0,0.08)" : "#F8FAFB", border: `1.5px solid ${holdField === opt ? "#CC0000" : "#D0D8E0"}`, borderRadius: 7, cursor: "pointer", ...TM, fontSize: 11, color: holdField === opt ? "#CC0000" : "#1A2A35", fontWeight: holdField === opt ? 700 : 400 }}>
+                {holdField === opt ? "▶  " : "    "}{opt}
+              </button>
             ))}
           </div>
-        </div>
+          <div style={{ padding: "10px 12px 16px", display: "grid", gap: 8 }}>
+            <button onClick={() => holdField && setVerifyModal(v => ({ ...v, qv1Phase: "holdResult" }))}
+              style={{ ...TM, padding: "13px 0", background: holdField ? "#CC0000" : "#C8D4DC", color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: holdField ? "pointer" : "not-allowed", letterSpacing: 1 }}>
+              CONFIRM — {holdField ? holdField.toUpperCase() : "SELECT A FIELD"}
+            </button>
+            <button onClick={() => setVerifyModal(v => ({ ...v, qv1Phase: "review" }))}
+              style={{ ...TM, padding: "10px 0", background: "transparent", color: "#4A8FA5", border: "1px solid #D0D8E0", borderRadius: 8, fontSize: 10, cursor: "pointer" }}>
+              ← BACK — REVIEW TABLE AGAIN
+            </button>
+          </div>
+        </ModalWrap>
+      );
 
-        <div style={{ padding: "10px 12px 16px", display: "grid", gap: 8 }}>
-          <button onClick={() => { approveData(rx); onClose(); }} style={{ ...TM, padding: "13px 0", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>
-            ✓ APPROVE — RELEASE TO FILL
-          </button>
-          <button onClick={onClose} style={{ ...TM, padding: "10px 0", background: "transparent", color: "#4A8FA5", border: "1px solid #D0D8E0", borderRadius: 8, fontSize: 10, cursor: "pointer", letterSpacing: 1 }}>
-            HOLD — NEEDS CLARIFICATION
-          </button>
-        </div>
-      </ModalWrap>
-    );
+      // holdResult phase
+      const pickedId = labelToField[holdField];
+      const isCorrectCatch = !!(qv1Error && pickedId === qv1Error.field);
+      const isFalseHold = !qv1Error;
+      const isWrongField = !!(qv1Error && !isCorrectCatch);
+      return (
+        <ModalWrap>
+          <ModalHeader title="DATA VERIFICATION" sub="QV1 — RESULT" />
+          <div style={{ margin: "12px 12px 0", borderRadius: 8, overflow: "hidden", border: `1px solid ${isCorrectCatch ? "rgba(63,185,80,0.4)" : "rgba(255,68,68,0.35)"}` }}>
+            <div style={{ background: isCorrectCatch ? "rgba(63,185,80,0.1)" : isFalseHold ? "rgba(255,68,68,0.08)" : "rgba(255,184,0,0.1)", padding: "14px 16px" }}>
+              <div style={{ ...TM, fontSize: 15, fontWeight: 800, marginBottom: 8, color: isCorrectCatch ? "#3FB950" : isFalseHold ? "#FF4444" : "#FFB800" }}>
+                {isCorrectCatch ? "✓ GOOD CATCH!" : isFalseHold ? "✗ FALSE HOLD" : "✗ WRONG FIELD"}
+              </div>
+              <div style={{ ...TM, fontSize: 10, lineHeight: 1.6, color: "#1A2A35" }}>
+                {isCorrectCatch && (
+                  <>You identified the <strong>{qv1Error.label}</strong> mismatch.<br />
+                  Hard copy: <strong style={{ color: "#0B4030" }}>{qv1Error.correct}</strong> &nbsp;·&nbsp;
+                  Entered: <strong style={{ color: "#CC0000" }}>{qv1Error.entered}</strong><br />
+                  Script corrected and released to fill.</>
+                )}
+                {isFalseHold && (
+                  <>All fields matched the hard copy — no discrepancy existed.<br />
+                  Unnecessary holds slow the queue and patient wait time.</>
+                )}
+                {isWrongField && (
+                  <><strong>{holdField}</strong> matched. The actual mismatch was <strong>{qv1Error.label}</strong>:<br />
+                  Hard copy: <strong style={{ color: "#0B4030" }}>{qv1Error.correct}</strong> &nbsp;·&nbsp;
+                  Entered: <strong style={{ color: "#CC0000" }}>{qv1Error.entered}</strong></>
+                )}
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: "10px 12px 16px" }}>
+            <button onClick={() => { approveData(rx, isCorrectCatch); onClose(); }}
+              style={{ ...TM, width: "100%", padding: "13px 0", background: isCorrectCatch ? "#0B4020" : "#0B1F3A", color: isCorrectCatch ? "#3FB950" : "#7EB8C9", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>
+              {isCorrectCatch ? "✓ CORRECTED — RELEASE TO FILL" : "RELEASE TO FILL"}
+            </button>
+          </div>
+        </ModalWrap>
+      );
+    }
 
     return (
       <ModalWrap>
@@ -5431,8 +5542,8 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                 <div style={{ ...TM, fontSize: 10, color: "#3A5060", marginTop: 1 }}>{rx.strength} · #{rx.qty}</div>
                 <div style={{ ...TM, fontSize: 9, color: "#8A9AAA", marginTop: 2, lineHeight: 1.3 }}>{rx.sig}</div>
                 <PressureMeter rx={rx} />
-                <button onClick={() => setVerifyModal({ rx, stage: "qv1" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: "#CC0000", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
-                  QV1 — VIEW &amp; VERIFY ▶
+                <button onClick={() => setVerifyModal({ rx, stage: "qv1", qv1Phase: "review", holdField: null })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: "#CC0000", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                  {rx.qv1Error ? "⚠ QV1 — REVIEW SCRIPT" : "QV1 — VERIFY ▶"}
                 </button>
               </div>
             </div>
