@@ -929,6 +929,229 @@ const SCENARIOS = [
       { text: "Tell her to sponge the baby with lukewarm water and come back if the fever gets higher.", verdict: "bad", fb: "Watchful waiting and home remedies are inappropriate for a febrile infant this young. Immediate medical evaluation is the only appropriate guidance — delay risks missing a life-threatening infection." },
     ],
   },
+
+  // ── 20 NEW SCENARIOS ──────────────────────────────────────────────────────
+
+  {
+    skill: "error", level: 3,
+    who: "Angry early-refill patient",
+    situation: "A patient slaps her lisinopril bag on the counter: 'The system is rejecting my Xanax — Reject Code 76, Refill Too Soon — but I lost the bottle at the beach last weekend. I need it now.' She's been a regular patient for two years and her tone is escalating.",
+    choices: [
+      { text: "Explain that Reject Code 76 (Refill Too Soon) means the insurer won't pay because it's too early by their records; offer to contact the prescriber for an 'early refill due to lost medication' override or have the patient pay cash, then document the loss claim and check the state PDMP before dispensing.", verdict: "best", fb: "Insurance won't waive a Refill Too Soon reject without prescriber involvement or a cash pay option. Documenting the lost-medication claim and running the PDMP first protects the pharmacy legally and is the standard professional approach." },
+      { text: "Override the reject yourself in the system and dispense it to help her out.", verdict: "bad", fb: "Technicians and pharmacists cannot override a clinical-edit rejection without a valid prescriber authorization or documented medical necessity. Unauthorized overrides are a compliance violation and potential diversion risk." },
+      { text: "Tell her to call her doctor and come back when the reject clears — there's nothing you can do today.", verdict: "ok", fb: "Referring to the prescriber is correct, but abandoning the patient at the counter without offering cash-pay pricing or helping her reach the office is an incomplete response that leaves her without a plan." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 3,
+    who: "Prior-auth fury",
+    situation: "A patient drops off a prescription for Dupixent (dupilumab) for severe eczema. The system immediately returns a Prior Authorization Required reject. He shouts, 'I've been waiting THREE WEEKS for this — this is insane. That drug costs $3,000 a month!'",
+    choices: [
+      { text: "Acknowledge his frustration calmly, explain that prior authorization means his insurance requires the prescriber to document medical necessity before it will cover the drug, give him a printed PA rejection notice for the doctor's office, and tell him the pharmacy can fax the request info to the prescriber today so they can start the PA process.", verdict: "best", fb: "A PA reject requires the prescriber to initiate the insurance review — the pharmacy's role is to communicate the reject clearly, give the office everything needed to file quickly, and manage the patient's expectations without dismissing their frustration." },
+      { text: "Tell him the insurance company is the problem and there's nothing the pharmacy can do.", verdict: "bad", fb: "While the insurer does require the PA, the pharmacy can and should actively facilitate by faxing the rejection notice to the prescriber and explaining the process. Blaming the insurer without offering next steps leaves the patient helpless." },
+      { text: "Suggest he look into manufacturer patient-assistance programs (e.g., Dupixent MyWay) while the PA is processed.", verdict: "ok", fb: "Mentioning co-pay assistance is helpful context, but it should accompany — not replace — explaining the PA process and initiating contact with the prescriber. On its own this doesn't solve the immediate rejection." },
+    ],
+  },
+
+  {
+    skill: "error", level: 4,
+    who: "DAW-1 mismatch",
+    situation: "A prescription comes in for Synthroid 100 mcg with 'DAW-1' keyed in by the prescriber's fax (Dispense As Written — prescriber required). But when you look at the actual fax, the DAW box is blank and there is no written notation saying brand required. The insurance will only cover generic levothyroxine.",
+    choices: [
+      { text: "Do not apply DAW-1 on the prescriber's behalf. Call the prescriber's office to clarify whether brand-name Synthroid is truly required; if confirmed, have them send a corrected prescription with DAW-1 explicitly noted. Explain to the patient that brand may cost more out of pocket if the DAW is confirmed.", verdict: "best", fb: "DAW-1 must be an explicit prescriber decision documented on the prescription — the pharmacy cannot assign it on the prescriber's behalf. Billing DAW-1 when the prescriber didn't mark it is insurance fraud and a dispensing error waiting to happen." },
+      { text: "Apply DAW-1 since the office probably meant to check it and dispense Synthroid.", verdict: "bad", fb: "Assuming prescriber intent and applying DAW-1 without written authorization is insurance fraud. It also removes the patient's right to a less expensive generic when the prescriber may not have actually required brand." },
+      { text: "Dispense generic levothyroxine and bill it without a DAW code since the fax was blank.", verdict: "ok", fb: "Dispensing generic when no DAW is documented is technically correct for the insurance billing, but it bypasses clarification with the prescriber — for narrow-therapeutic-index drugs like levothyroxine, calling to confirm is worth the extra step." },
+    ],
+  },
+
+  {
+    skill: "error", level: 4,
+    who: "Returned controlled substance",
+    situation: "A patient slides a partially-used 30-count bottle of hydrocodone/APAP 5/325 through the window and says, 'You guys filled the wrong thing — this isn't what my doctor ordered. I want the right one.' The seal is broken and roughly 10 tablets appear to be missing.",
+    choices: [
+      { text: "Do not accept the returned controlled substance into stock. Explain that federal law prohibits pharmacies from accepting returned Schedule II/III medications once dispensed. Compare the current prescription to what was dispensed; if an error occurred, document it, notify the pharmacist-in-charge, and work with the prescriber on next steps — but the opened CII bottle cannot be returned.", verdict: "best", fb: "DEA regulations prohibit the return of dispensed controlled substances to pharmacy stock. If a dispensing error occurred it must be documented and reported, but the pharmacy cannot retake possession of an opened CII. A new prescription would be needed if an error is confirmed." },
+      { text: "Accept the bottle back, recount the tablets, and credit their account if your records confirm an error.", verdict: "bad", fb: "Accepting a returned opened controlled substance is a federal DEA violation regardless of whether an error occurred. Tablets cannot be verified after they leave the pharmacy's custody." },
+      { text: "Call the pharmacist over immediately and let them handle it while you help the next patient.", verdict: "ok", fb: "Escalating to the pharmacist is appropriate — this is a complex situation. But you should understand the reason: returned CIIs are prohibited by DEA regulation. The pharmacist will explain the same thing, so understanding the rule yourself is part of your role." },
+    ],
+  },
+
+  {
+    skill: "counsel", level: 2,
+    who: "Drive-through rush patient",
+    situation: "It's 5:15 PM on a Friday. The drive-through has six cars backed up. A patient pulls up with four prescriptions and says, 'I'll wait — just do all four.' Three of the four haven't been started yet. The queue is at 45 minutes.",
+    choices: [
+      { text: "Pull up all four prescriptions, run insurance on each, and give the patient an honest estimate: 'We have a 45-minute wait right now — would you prefer to wait, or can I text you when they're all ready?' If they insist on waiting, confirm they understand the time and get them moving through the lane.", verdict: "best", fb: "Transparency about wait times respects the patient's time and keeps the drive-through moving. Offering text notification is a standard retail pharmacy tool that reduces congestion without losing the patient's business." },
+      { text: "Tell them to come inside if they want to wait — drive-through is for quick pickups only.", verdict: "ok", fb: "Directing to the front counter is not wrong, but communicating it as a hard rule rather than a helpful suggestion can feel dismissive. The real goal is managing the line honestly and giving the patient a real choice." },
+      { text: "Process the prescriptions quickly and tell the patient it'll be just a few minutes so they don't leave.", verdict: "bad", fb: "Giving a false time estimate to keep a customer in line creates frustration, backs up the drive-through, and erodes trust. It also pressures the filling process in ways that increase error risk." },
+    ],
+  },
+
+  {
+    skill: "counsel", level: 2,
+    who: "Partial fill request",
+    situation: "A patient at the counter says his azithromycin Z-pack costs $28 today because his insurance lapsed. 'Can you just give me two or three tablets to get me started? I'll pay for the rest when I get paid Friday.' The prescription is for azithromycin 250 mg, quantity 6.",
+    choices: [
+      { text: "Explain that for most non-controlled medications a partial fill is technically possible but creates clinical risk — azithromycin is a 5-day course and partial filling means incomplete treatment. Offer to run GoodRx or discount-card pricing to see if the full $28 can be reduced, and give the full course if at all possible.", verdict: "best", fb: "Partial filling a Z-pack defeats the purpose of the full 5-day course and risks treatment failure and resistance. The better first move is to reduce out-of-pocket cost with a discount card before considering partial dispensing." },
+      { text: "Give him just 3 tablets and bill for those — it's better than nothing.", verdict: "ok", fb: "A partial dispensing is better than no treatment, but you should exhaust lower-cost options (GoodRx, manufacturer coupons, $4 programs) before splitting the course. Antibiotics given in sub-therapeutic courses promote resistance." },
+      { text: "Tell him you can only dispense the full quantity — he'll have to figure out the payment.", verdict: "bad", fb: "Refusing without exploring discount programs or assistance options is an incomplete response that may leave the patient untreated. Checking discount pricing takes seconds and is part of patient care." },
+    ],
+  },
+
+  {
+    skill: "counsel", level: 3,
+    who: "Metoprolol vs. metformin confusion",
+    situation: "An 80-year-old woman is picking up refills for both metoprolol succinate 50 mg and metformin 500 mg. She holds up both bottles and says, 'I got confused last week — they sound so alike. Which one is the heart one and which is the sugar one?' Her daughter is with her and both look genuinely puzzled.",
+    choices: [
+      { text: "Take a moment to clearly differentiate: 'Metoprolol — the one with the letter O near the end — is for your heart and blood pressure; metformin — ends in -formin — is for blood sugar.' Use the label color, pill appearance, and a written note to reinforce the distinction, and suggest they ask the prescriber about pill organizer labels or pharmacy blister packs.", verdict: "best", fb: "Metoprolol/metformin is a classic look-alike, sound-alike (LASA) drug pair. For elderly patients on both, a clear mnemonic, visual cue, and written aid dramatically reduces the risk of mix-up — which could cause hypoglycemia or a missed cardiac dose." },
+      { text: "Tell her the bottles are labeled, so just read the label carefully each time.", verdict: "bad", fb: "Telling a confused elderly patient to 'read the label' is inadequate for a LASA pair. She has already demonstrated the need for an active intervention — a brief, memorable distinction is the pharmacist's job here." },
+      { text: "Suggest she separate the two bottles on different shelves at home to avoid confusion.", verdict: "ok", fb: "Physical separation is a reasonable home-safety tip, but it doesn't address her existing confusion about which drug does what. The full response should include both the mnemonic/education and the storage advice." },
+    ],
+  },
+
+  {
+    skill: "otc", level: 2,
+    who: "Lapsed-insurance patient",
+    situation: "A patient arrives for her regular Crestor (rosuvastatin 20 mg) refill and learns her insurance lapsed two weeks ago. The brand-name price is $312. She looks stricken: 'I can't pay that. Is there anything cheaper?'",
+    choices: [
+      { text: "Check GoodRx or similar discount programs for rosuvastatin — generic rosuvastatin is available and typically costs $10–30 with a discount card. Explain that rosuvastatin is available as a generic, which is therapeutically equivalent, and offer to reach out to the prescriber if a formulary switch (e.g., simvastatin, pravastatin) is needed to fit her budget.", verdict: "best", fb: "Generic rosuvastatin is therapeutically equivalent to Crestor and available at dramatically lower cost with discount programs. Offering concrete pricing options and a path to the prescriber for therapeutic substitution is comprehensive patient-centered care." },
+      { text: "Tell her to reapply for insurance and come back when she has coverage.", verdict: "bad", fb: "Leaving a patient without her statin while she navigates insurance re-enrollment creates real cardiovascular risk. The pharmacy has tools — generics, discount cards, patient assistance — that should be offered immediately." },
+      { text: "Tell her the generic is available and let her decide, but don't look up pricing.", verdict: "ok", fb: "Mentioning the generic is correct, but providing actual discount-card pricing takes 30 seconds and makes the option concrete and actionable. Stopping at 'a generic exists' is an incomplete response." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 3,
+    who: "Public accusation patient",
+    situation: "A patient is at the busy front counter during the lunch rush. He shouts loud enough for five other patients to hear: 'You people filled the WRONG medication AGAIN. Last time it was the wrong dose, now it's the wrong quantity — this pharmacy is a disaster!' When you pull up his profile, you see his metformin 500 mg was correctly filled at quantity 90 exactly as written.",
+    choices: [
+      { text: "Stay calm, lower your voice to de-escalate, and say: 'I want to make sure we get this right — can we step to the side so I can pull up your prescription and go over it together?' Review the label vs. the prescription with him privately, then walk through what was dispensed and what was ordered.", verdict: "best", fb: "De-escalation in a public space starts with lowering your own voice and moving the conversation somewhere private. Reviewing the actual prescription with the patient is the fastest way to resolve a perceived error — and maintaining professional composure protects other patients' experience." },
+      { text: "Loudly confirm in front of the other patients that the fill was correct and his reading of the label was wrong.", verdict: "bad", fb: "Correcting a patient publicly is humiliating and escalates conflict. Even if you are 100% correct, the confrontational approach destroys trust and embarrasses the patient in front of others." },
+      { text: "Apologize and offer to refill the prescription without reviewing whether an error occurred.", verdict: "ok", fb: "Offering to make it right is good customer service, but apologizing and refilling when no error occurred is clinically incorrect and potentially harmful. Verify first — then respond accordingly." },
+    ],
+  },
+
+  {
+    skill: "error", level: 4,
+    who: "CII pickup without authorization",
+    situation: "A woman presents to pick up oxycodone ER 20 mg for her father, whose name is on the prescription. There is no authorized designee on file for the patient. She says, 'He's in the car — he's in too much pain to walk in.'",
+    choices: [
+      { text: "Ask the father to come to the window or door to present ID and confirm the pickup — or have him sign an authorization form from the car. Document the relationship and ID of the person picking up. Do not release the CII without directly verifying with the patient.", verdict: "best", fb: "CII controlled substances require identity verification at the point of dispensing. If the patient is present in the parking lot, asking them to come to the window (even briefly) or having staff bring the form to the car is a reasonable accommodation. Releasing to a third party with no authorization is a DEA compliance issue." },
+      { text: "Release the medication since the patient is clearly nearby and she's family.", verdict: "bad", fb: "Proximity and family relationship do not substitute for documented authorization. DEA regulations require verification before dispensing a Schedule II to any third party." },
+      { text: "Refuse to dispense at all unless the patient physically enters the building.", verdict: "ok", fb: "Refusing without exploring options is overly rigid. A brief car-window verification or pharmacist-accompanied curbside authorization are reasonable accommodations for a patient in pain — the goal is compliance, not obstruction." },
+    ],
+  },
+
+  {
+    skill: "error", level: 3,
+    who: "NPLEx near-limit customer",
+    situation: "A man hands you a box of Sudafed 12-hour, 20 count. When you run his ID through the NPLEx electronic log, the system shows he has purchased 8.2 grams of pseudoephedrine in the past 30 days. The federal monthly limit is 9 grams. The current box would bring him to 9.1 grams.",
+    choices: [
+      { text: "Decline the sale. Explain that the federal Combat Methamphetamine Epidemic Act (CMEA) caps pseudoephedrine at 9 grams per 30 days, and his purchase history means this box would exceed the limit. Do not override the NPLEx flag.", verdict: "best", fb: "When the NPLEx system flags an impending limit breach, the pharmacist or technician must decline the sale. Selling above the CMEA limit is a federal violation regardless of the customer's explanation. State the reason matter-of-factly without accusation." },
+      { text: "Sell the box since he's only slightly over the limit and it's probably a coincidence.", verdict: "bad", fb: "The CMEA limit is absolute — there is no 'slightly over' exception. Selling over the gram limit is a federal violation that jeopardizes the pharmacy's DEA registration." },
+      { text: "Sell him a smaller box so that the total stays just under 9 grams.", verdict: "ok", fb: "Calculating whether a smaller purchase stays within the limit is technically legal if the math works out, but once the NPLEx flag has been triggered and the cumulative pattern is this high, pharmacist judgment about whether to complete any sale is appropriate. Document the interaction regardless." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 2,
+    who: "Medicaid brand demand",
+    situation: "A Medicaid patient is picking up atorvastatin 40 mg. He insists he wants brand-name Lipitor and is frustrated when you explain the claim rejected as 'Brand Not Covered — Generic Available.' He says, 'I've been on the brand for years and it works. Just bill it as generic.'",
+    choices: [
+      { text: "Explain that Medicaid requires generic substitution when a therapeutic equivalent is available and covers the generic at no cost to him; billing brand as generic would be Medicaid fraud. Reassure him that generic atorvastatin and Lipitor are bioequivalent. If he truly wants brand, he must pay the full brand cash price out of pocket.", verdict: "best", fb: "Medicaid will not cover brand-name drugs when a generic is available, and billing brand as generic to a government payer is fraud. Educating the patient on bioequivalence while clearly explaining the coverage rule and the cash-pay option is the correct approach." },
+      { text: "Change the DAW code to dispense the brand and see if it goes through.", verdict: "bad", fb: "Manipulating DAW codes to get a Medicaid claim to process for brand when a generic is available is Medicaid fraud — a federal offense that can result in exclusion from federal health programs." },
+      { text: "Tell him to call Medicaid directly and complain if he wants the brand covered.", verdict: "ok", fb: "Directing him to Medicaid is not wrong — he does have appeal rights — but skipping the bioequivalence counseling and the explanation of the cash-pay option is an incomplete response. The pharmacist's first job is to make sure he understands the options." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 2,
+    who: "Refund demand for returned medication",
+    situation: "A woman comes back to the pharmacy with a 30-count bottle of escitalopram 10 mg she picked up four days ago. 'This medication made me feel terrible — nausea, headaches. I don't want it. I need my money back.' The bottle has been opened and about 8 tablets are missing.",
+    choices: [
+      { text: "Empathize with her side effects, explain that once a prescription leaves the pharmacy it cannot be returned or resold for safety and regulatory reasons, and offer to connect her with the pharmacist who can counsel her on the typical timeline for escitalopram start-up side effects (nausea often resolves in 1–2 weeks) and suggest she contact her prescriber.", verdict: "best", fb: "State pharmacy regulations prohibit the return of dispensed medications for resale. However, the patient needs empathy and clinical context — escitalopram start-up GI side effects are common and usually transient, and the prescriber can advise on whether to continue or switch." },
+      { text: "Accept the return and issue a refund to avoid a scene.", verdict: "bad", fb: "Accepting returned dispensed prescription medications violates state pharmacy regulations and USP standards. Returned medications cannot be verified for integrity and cannot legally re-enter inventory." },
+      { text: "Refuse the return and tell her to call her doctor, then walk away.", verdict: "ok", fb: "Refusing the return is correct, but the abrupt dismissal misses the counseling opportunity. Escitalopram side-effect education and prescriber follow-up guidance are part of a complete response." },
+    ],
+  },
+
+  {
+    skill: "counsel", level: 4,
+    who: "First solo warfarin counseling",
+    situation: "The pharmacist calls you over: 'I need you to counsel Mrs. Okafor on her new warfarin prescription — she's your patient.' Your heart rate jumps. Mrs. Okafor is 71, picking up warfarin 5 mg for newly diagnosed atrial fibrillation. This is your first solo counseling.",
+    choices: [
+      { text: "Take a breath, greet her by name, and cover the key points systematically: what warfarin does (prevents clots), why consistent dosing time matters, the critical vitamin-K dietary interaction (leafy greens), signs of bleeding to watch for, the importance of INR monitoring appointments, and what to do if she misses a dose. Use teach-back: 'Can you tell me in your own words when you'd call the doctor?'", verdict: "best", fb: "Warfarin counseling has defined high-stakes elements: dose timing, dietary consistency (not elimination) of vitamin K, bleeding warning signs, and INR monitoring adherence. Teach-back confirms understanding — for a new anticoagulant patient, that confirmation is essential and potentially life-saving." },
+      { text: "Hand her the package insert and tell her to read it and call her doctor with questions.", verdict: "bad", fb: "Package inserts are dense and not patient-friendly. Delegating education to a document and a phone call fails the counseling standard, especially for a high-risk anticoagulant in a new elderly patient." },
+      { text: "Cover only the basics (take it at the same time each day) and ask the pharmacist to finish the rest because you're nervous.", verdict: "ok", fb: "Recognizing your limits and escalating is appropriate when needed. However, warfarin counseling is a core competency — if you can cover the critical topics (with the pharmacist nearby), doing your best with supervision builds skill. Handing off entirely should be a last resort." },
+    ],
+  },
+
+  {
+    skill: "counsel", level: 1,
+    who: "Alcohol and amoxicillin question",
+    situation: "A college student picks up amoxicillin 500 mg TID for a sinus infection. On the way out he turns back and asks, 'Can I still drink this weekend? Like, will it mess up the antibiotic or make me really sick?'",
+    choices: [
+      { text: "Explain that amoxicillin does not have a direct dangerous interaction with alcohol — unlike metronidazole or tinidazole — but alcohol can impair immune function and worsen recovery. Moderate drinking probably won't make the antibiotic fail, but heavy drinking while sick is counterproductive. Advise completing the full course regardless.", verdict: "best", fb: "Unlike metronidazole (which causes a disulfiram-like reaction with alcohol), amoxicillin has no direct alcohol-drug interaction. Giving accurate information — rather than a reflexive 'no alcohol with antibiotics' — is more credible and educational, and completing the course is the most important adherence message." },
+      { text: "Tell him absolutely no alcohol with any antibiotic.", verdict: "ok", fb: "Saying no alcohol is conservative and not harmful, but it's not accurate for amoxicillin specifically and lumps it with drugs like metronidazole that do have serious interactions. Giving accurate, drug-specific counseling builds more trust than a blanket rule." },
+      { text: "Say it doesn't matter, antibiotics and alcohol are always fine together.", verdict: "bad", fb: "This is overly broad and wrong for several antibiotics (metronidazole, tinidazole, sulfonamides). Even for amoxicillin where the direct interaction is minimal, alcohol impairs recovery — the blanket 'always fine' statement is clinically inaccurate." },
+    ],
+  },
+
+  {
+    skill: "counsel", level: 3,
+    who: "Mixed-up insulin pens",
+    situation: "A diabetic patient comes to the counter confused: 'I have two insulin pens — the pharmacist last time said one is for meals and one is at night, but I think I've been using them backwards.' She holds up a Lantus SoloSTAR (glargine, basal) and a Humalog KwikPen (lispro, rapid-acting). Her blood sugars have been running high at night.",
+    choices: [
+      { text: "Identify both pens for her clearly: Humalog (the clear pen with rapid label) is mealtime insulin — taken within 15 minutes of eating; Lantus (also clear but labeled differently) is the once-daily basal given at the same time each evening. Emphasize they must never be mixed, show her the distinguishing pen labels and caps, and advise her to contact her prescriber about her recent blood sugars.", verdict: "best", fb: "Basal/bolus confusion is a dangerous and common insulin error. Pharmacist intervention to visually differentiate the pens, explain timing with meals vs. bedtime, and prompt prescriber follow-up for out-of-control glucose readings is the standard of care for insulin counseling." },
+      { text: "Tell her to call her endocrinologist and sort it out with them.", verdict: "ok", fb: "Prescriber follow-up is appropriate, but the pharmacist can and should clarify the pens right now — the patient is at the counter with both pens in hand. Deferring entirely wastes the immediate opportunity to correct a potentially dangerous error." },
+      { text: "Reassure her the mix-up probably isn't a big deal and she'll figure it out.", verdict: "bad", fb: "Using mealtime insulin as basal (or vice versa) is a serious error that can cause hypoglycemia or prolonged hyperglycemia. Dismissing this as 'not a big deal' is clinically negligent." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 4,
+    who: "Teen birth control privacy",
+    situation: "A 16-year-old girl quietly asks for her oral contraceptive prescription. While you're processing it, you notice her mother is shopping three aisles away. The patient whispers: 'Please don't tell my mom — she's right over there.'",
+    choices: [
+      { text: "Reassure her that her prescription is confidential under HIPAA and applicable minor-consent laws for reproductive health; speak quietly, keep the transaction discreet, and do not alert or involve the mother. Do not lie to the mother if she directly asks about her daughter's prescriptions — but proactively disclose nothing.", verdict: "best", fb: "Most states grant minors the right to consent to contraceptive services confidentially. HIPAA and minor-consent law protect that privacy. The pharmacist should not proactively disclose the prescription to the parent, but should not actively deceive either if directly questioned." },
+      { text: "Step out from behind the counter and let the mother know her daughter is picking up a sensitive prescription.", verdict: "bad", fb: "Proactively disclosing a minor's confidential reproductive health prescription to a parent violates both HIPAA and minor-consent statutes in most states. It also puts the patient at potential risk." },
+      { text: "Whisper to the teen that she should come back without her mom to avoid the awkwardness.", verdict: "ok", fb: "This protects her privacy in the moment but does not reassure her of her rights or process her prescription. The teen is legally entitled to pick up her prescription now — send her away without explanation is an unhelpful non-solution." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 2,
+    who: "After-hours refill request",
+    situation: "A patient comes to the counter at 6:45 PM wanting a refill of her lisinopril 10 mg. The bottle shows 0 refills remaining. She says, 'My doctor's office closed at 5 — can you just call them and get me some?' She has enough tablets to last two more days.",
+    choices: [
+      { text: "Explain that you can't reach the office until tomorrow morning, but offer to provide an emergency supply (typically 3–7 days depending on state law) to bridge the gap and document the dispensing. Let her know you'll send a refill request to the prescriber first thing tomorrow.", verdict: "best", fb: "Emergency dispensing provisions exist in most states for chronic maintenance medications like antihypertensives when a patient would otherwise run out. A bridge supply with same-day prescriber contact the next morning is the standard professional response." },
+      { text: "Refuse any dispensing until you can reach the prescriber — rules are rules.", verdict: "ok", fb: "Waiting for prescriber contact is legally safe, but refusing to provide a bridge supply for a blood-pressure medication when emergency dispensing is permitted could leave the patient without medication and at clinical risk. Check your state's emergency supply rules before refusing outright." },
+      { text: "Call the after-hours emergency line for the prescriber's practice to get verbal authorization tonight.", verdict: "ok", fb: "Attempting to reach the on-call line is a reasonable option, but after-hours calls for routine refills of maintenance medications are often inappropriate use of emergency lines. The emergency supply pathway exists exactly for this scenario." },
+    ],
+  },
+
+  {
+    skill: "error", level: 4,
+    who: "Potentially altered prescription",
+    situation: "A young man presents a paper prescription for oxycodone 30 mg #60. The quantity field has visible scratch-outs — the number looks like it may have been changed from '30' to '60'. The ink color on the quantity appears slightly different from the rest of the prescription.",
+    choices: [
+      { text: "Do not dispense. Call the prescriber's office directly using a number you independently verify (not one written on the prescription) to confirm the prescription details. Document your findings. If the quantity cannot be verified or the prescriber denies writing it as presented, refuse dispensing and notify the pharmacist-in-charge. Consider reporting to law enforcement per your state's protocol.", verdict: "best", fb: "A prescription with visible alterations to a CII quantity is a major red flag for forgery. Calling the prescriber at a verified number — not any number on the script — is essential. Federal law and most state laws require pharmacists to exercise professional judgment and refuse to fill suspicious CII prescriptions. Documentation and reporting are part of the protocol." },
+      { text: "Fill it — the prescription has a DEA number and a real doctor's name, so it's probably fine.", verdict: "bad", fb: "The presence of a DEA number does not validate an altered prescription. Altered CII prescriptions are a common form of fraud. Dispensing without verifying is a professional and legal liability." },
+      { text: "Ask the patient about the scratch-out and decide based on their explanation.", verdict: "ok", fb: "Asking the patient is not unreasonable, but a patient presenting an altered prescription has every incentive to explain it away. The definitive verification must be a direct call to the prescriber — not the patient's account." },
+    ],
+  },
+
+  {
+    skill: "interact", level: 2,
+    who: "Rage-quit wait-time patient",
+    situation: "A customer storms up to the drop-off counter after a 45-minute wait for his atenolol and lisinopril. He throws the paper receipt down and says to you directly: 'This is YOUR fault. Every single time I come here it's a 45-minute wait. You're all incompetent and I'm reporting this to corporate.' The queue behind him has four people.",
+    choices: [
+      { text: "Stay calm and say: 'I'm sorry the wait was that long today — that's genuinely frustrating. Let me get your prescriptions right now.' De-escalate by focusing on his immediate need, not the argument. Do not match his energy, blame the system back at him, or apologize in a way that promises future fixes you can't guarantee.",
+        verdict: "best", fb: "Staying calm and focusing on the patient's immediate need is the single most effective de-escalation tool. Acknowledging the frustration without being defensive and moving to action (getting the prescription) redirects energy from conflict to resolution. Corporate complaints are his right — don't challenge it." },
+      { text: "Explain to him that the pharmacy is understaffed and it's not your personal fault.", verdict: "ok", fb: "Context is understandable, but justifying the wait to an angry patient often reads as excuses and escalates the conflict. Acknowledgment first, then if a natural opening exists, brief context can follow — but leading with the explanation inflames rather than resolves." },
+      { text: "Tell him if he's going to yell you'll have to step away until he calms down.", verdict: "bad", fb: "Threatening to disengage from an irate patient in a retail pharmacy is likely to escalate the situation further and is not the standard customer-service response. It also leaves the four people behind him waiting longer. Unless there is a safety concern, stay engaged and professional." },
+    ],
+  },
 ];
 
 /* ============================================================
