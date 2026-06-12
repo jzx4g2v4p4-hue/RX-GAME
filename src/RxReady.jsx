@@ -4434,12 +4434,25 @@ function FillCheck({ level, onFinish, onQuit }) {
   );
 }
 
+const CVS_PLANS = [
+  "Caremark / CVS Health",
+  "SilverScript (Part D)",
+  "Aetna CVS Health",
+  "Blue Cross / Caremark",
+  "Medicaid / Virginia",
+  "Tricare / DoD",
+  "UnitedHealth / OptumRx",
+  "Humana / Walmart",
+  "Cash / No Insurance",
+];
+const SCRIPT_TYPES = ["eRx", "eRx", "eRx", "FAX", "FAX", "PHONE", "DROP"];
+
 function managerRxFromFillCase(c, i, level = 4) {
   const lanes = ["Drive-thru", "Counter", "Waiter", "Phone"];
-  // Level-scaled patience: intern gets much more time, expert gets pressure
   const baseByLevel = [0, 90000, 65000, 45000, 28000][level] ?? 45000;
   const spread = ((i * 11000) % 26000);
   const patienceMs = baseByLevel + spread;
+  const rxNum = String(Math.floor(1000000 + ((i * 912347 + 5483921) % 8999999)));
   return {
     id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
     patient: c.rx.patient,
@@ -4452,6 +4465,9 @@ function managerRxFromFillCase(c, i, level = 4) {
     patienceStartedAt: Date.now(),
     deEscalated: false,
     fillCase: c,
+    rxNum,
+    insurancePlan: CVS_PLANS[i % CVS_PLANS.length],
+    scriptType: SCRIPT_TYPES[i % SCRIPT_TYPES.length],
   };
 }
 
@@ -5029,11 +5045,20 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     const pct = Math.max(0, Math.min(100, (left / rx.patienceMs) * 100));
     const hot = pct <= 28;
     const color = pct <= 20 ? "#FF4444" : pct <= 45 ? "#FFB800" : "#3FB950";
+    const promiseTime = (() => {
+      const d = new Date(rx.patienceStartedAt + rx.patienceMs);
+      return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    })();
     return (
       <div style={{ marginTop: 7 }}>
         <div style={{ fontFamily: "'Spline Sans Mono',monospace", display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9, color: hot ? "#FF4444" : "#8A9AAA" }}>
-          <span>{rx.lane?.toUpperCase()}{rx.deEscalated ? " / RECOVERED" : ""}</span>
-          <span>{left > 0 ? `${Math.ceil(left / 1000)}s` : "EXPIRED"}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            {rx.scriptType && <span style={{ background: rx.scriptType === "eRx" ? "rgba(63,185,80,0.15)" : rx.scriptType === "FAX" ? "rgba(126,184,201,0.15)" : "rgba(255,184,0,0.15)", color: rx.scriptType === "eRx" ? "#3FB950" : rx.scriptType === "FAX" ? "#7EB8C9" : "#FFB800", borderRadius: 3, padding: "1px 4px", fontSize: 7, fontWeight: 700, letterSpacing: 0.5 }}>{rx.scriptType}</span>}
+            <span>{rx.lane?.toUpperCase()}{rx.deEscalated ? " ✓ RECOVERED" : ""}</span>
+          </span>
+          <span style={{ color: left <= 0 ? "#FF4444" : hot ? "#FF4444" : "#8A9AAA" }}>
+            {left <= 0 ? "PAST DUE" : `Promise ${promiseTime}`}
+          </span>
         </div>
         <div style={{ height: 4, background: "#E8EDF1", borderRadius: 2, overflow: "hidden", marginTop: 4 }}>
           <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .25s linear" }} />
@@ -5136,13 +5161,14 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     );
 
     const ModalHeader = ({ title, sub }) => (
-      <div style={{ background: "#0B1F3A", padding: "12px 16px" }}>
+      <div style={{ background: "#CC0000", padding: "12px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2 }}>RXPRO — {title}</div>
-            <div style={{ ...TM, color: "#E8F4F8", fontSize: 13, fontWeight: 700, marginTop: 3 }}>{sub}</div>
+            <div style={{ ...TM, color: "rgba(255,255,255,0.65)", fontSize: 8, letterSpacing: 2 }}>CVS RxConnect — {title}</div>
+            <div style={{ ...TM, color: "#FFFFFF", fontSize: 13, fontWeight: 700, marginTop: 3 }}>{sub}</div>
+            <div style={{ ...TM, color: "rgba(255,255,255,0.6)", fontSize: 9, marginTop: 2 }}>Rx#{rx.rxNum} · {rx.patient} · {rx.insurancePlan || "Cash"}</div>
           </div>
-          <button onClick={onClose} style={{ ...TM, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#7EB8C9", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 10, letterSpacing: 1 }}>✕ CLOSE</button>
+          <button onClick={onClose} style={{ ...TM, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.25)", color: "#FFFFFF", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 10, letterSpacing: 1 }}>✕ CLOSE</button>
         </div>
         <div style={{ marginTop: 10 }}><PressureMeter rx={rx} /></div>
       </div>
@@ -5154,8 +5180,11 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
 
         <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
           <div style={{ background: "#0B1F3A", padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>ℝ PRESCRIPTION — HARDCOPY</span>
-            <span style={{ ...TM, color: "#4A8FA5", fontSize: 8 }}>{rx.lane?.toUpperCase()} · HC</span>
+            <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>℞ ORIGINAL PRESCRIPTION</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {rx.scriptType && <span style={{ ...TM, background: rx.scriptType === "eRx" ? "rgba(63,185,80,0.2)" : "rgba(126,184,201,0.2)", color: rx.scriptType === "eRx" ? "#3FB950" : "#7EB8C9", borderRadius: 3, padding: "1px 5px", fontSize: 7, fontWeight: 700 }}>{rx.scriptType}</span>}
+              <span style={{ ...TM, color: "#4A8FA5", fontSize: 8 }}>Rx#{rx.rxNum}</span>
+            </span>
           </div>
           <div style={{ padding: "10px 14px", borderBottom: "1px dashed #E0E8EF" }}>
             <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 3 }}>PATIENT</div>
@@ -5299,50 +5328,52 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   return (
     <div>
       {verifyModal && <ScriptModal vm={verifyModal} onClose={() => setVerifyModal(null)} />}
-      {/* ── RXPRO SHIFT HEADER ── */}
-      <div style={{ background: "#0B1F3A", borderRadius: "10px 10px 0 0", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+      {/* ── CVS SHIFT HEADER ── */}
+      <div style={{ background: "#CC0000", borderRadius: "10px 10px 0 0", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div>
-          <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2, marginBottom: 3 }}>RXPRO — SHIFT MANAGER VIEW</div>
-          <div style={{ ...TM, color: "#E8F4F8", fontSize: 12, fontWeight: 600 }}>QUEUE STATUS · QT / QV1 / QP / QV2</div>
+          <div style={{ ...TM, color: "rgba(255,255,255,0.65)", fontSize: 8, letterSpacing: 2, marginBottom: 3 }}>CVS PHARMACY · RXCONNECT</div>
+          <div style={{ ...TM, color: "#FFFFFF", fontSize: 13, fontWeight: 700 }}>SHIFT ACTIVE · QT / QV1 / QP / QV2</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           {[
-            { k: "CLEARED", v: completed, c: "#3FB950" },
-            { k: "ACC", v: completed ? `${Math.round((correct/completed)*100)}%` : "—", c: "#FFB800" },
-            { k: "SVC", v: `${serviceScore}%`, c: serviceColor },
-            { k: "STREAK", v: `×${chainStreak}`, c: chainStreak >= 5 ? "#3FB950" : "#7EB8C9" },
+            { k: "FILLED",  v: completed,                                                  c: "#FFFFFF" },
+            { k: "ACCURACY", v: completed ? `${Math.round((correct/completed)*100)}%` : "—", c: "#FFE57A" },
+            { k: "STAR",    v: `${serviceScore}%`,                                          c: serviceColor === C.green ? "#3FB950" : serviceColor === C.amber ? "#FFB800" : "#FF4444" },
+            { k: "STREAK",  v: `×${chainStreak}`,                                           c: chainStreak >= 5 ? "#3FB950" : "rgba(255,255,255,0.7)" },
           ].map(({ k, v, c }) => (
-            <div key={k} style={{ ...TM, textAlign: "center", background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "4px 8px" }}>
+            <div key={k} style={{ ...TM, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "4px 8px" }}>
               <div style={{ color: c, fontSize: 13, fontWeight: 700, lineHeight: 1 }}>{v}</div>
-              <div style={{ color: "#3A6070", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
+              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
             </div>
           ))}
-          <button onClick={wtfButton} style={{ ...TM, background: "rgba(255,68,68,0.2)", border: "1px solid rgba(255,68,68,0.5)", color: "#FF4444", borderRadius: 7, padding: "6px 11px", cursor: "pointer", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>
-            DE-ESCALATE
+          <button onClick={wtfButton} style={{ ...TM, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", borderRadius: 7, padding: "6px 11px", cursor: "pointer", fontSize: 10, fontWeight: 700 }}>
+            MANAGER CALL
           </button>
-          <button onClick={() => startSafeAudit()} style={{ ...TM, background: "rgba(126,184,201,0.12)", border: "1px solid rgba(126,184,201,0.25)", color: "#7EB8C9", borderRadius: 7, padding: "6px 11px", cursor: "pointer", fontSize: 10 }}>
-            END SHIFT
+          <button onClick={() => startSafeAudit()} style={{ ...TM, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#FFFFFF", borderRadius: 7, padding: "6px 11px", cursor: "pointer", fontSize: 10 }}>
+            CLOCK OUT
           </button>
         </div>
       </div>
 
-      {/* ── FLOOR STATUS STRIP ── */}
-      <div style={{ background: "#0F2A3F", padding: "10px 14px", marginBottom: 12, borderTop: "1px solid rgba(126,184,201,0.1)", borderRadius: "0 0 10px 10px" }}>
+      {/* ── RXCONNECT STATUS STRIP ── */}
+      <div style={{ background: "#0F2A3F", padding: "8px 14px 10px", marginBottom: 12, borderTop: "1px solid rgba(204,0,0,0.3)", borderRadius: "0 0 10px 10px" }}>
+        <div style={{ ...TM, color: "rgba(126,184,201,0.4)", fontSize: 6.5, letterSpacing: 2, marginBottom: 6 }}>RXCONNECT · LIVE QUEUE</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr) 2fr", gap: 7 }}>
           {[
-            { k: "QT",  v: toVerifyData.length, hi: 4 },
-            { k: "QV1", v: toVerifyData.length, hi: 4 },
-            { k: "QP",  v: inProduction.length, hi: 3 },
-            { k: "QV2", v: finalCheck.length,   hi: 3 },
-          ].map(({ k, v, hi }) => (
+            { k: "QT",  label: "To Type",   v: toVerifyData.length, hi: 4 },
+            { k: "QV1", label: "Verify",    v: toVerifyData.length, hi: 4 },
+            { k: "QP",  label: "Filling",   v: inProduction.length, hi: 3 },
+            { k: "QV2", label: "Final Chk", v: finalCheck.length,   hi: 3 },
+          ].map(({ k, label, v, hi }) => (
             <div key={k} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "6px 4px", textAlign: "center" }}>
               <div style={{ ...TM, color: v >= hi ? "#FF4444" : v > 0 ? "#FFB800" : "#3FB950", fontSize: 17, fontWeight: 700, lineHeight: 1 }}>{v}</div>
-              <div style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
+              <div style={{ ...TM, color: v >= hi ? "#FF4444" : "#3A6070", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
+              <div style={{ ...TM, color: "rgba(126,184,201,0.35)", fontSize: 6, marginTop: 1 }}>{label}</div>
             </div>
           ))}
           <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "6px 8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 1 }}>PRESSURE</span>
+              <span style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 1 }}>FLOOR PRESSURE</span>
               <span style={{ ...TM, color: chainPressure >= 70 ? "#FF4444" : chainPressure >= 45 ? "#FFB800" : "#3FB950", fontSize: 7 }}>{chainPressure}%</span>
             </div>
             <div style={{ height: 4, background: "rgba(0,0,0,0.4)", borderRadius: 2, overflow: "hidden" }}>
@@ -5387,16 +5418,21 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
           {!toVerifyData.length && <EmptyLane text="No scripts in queue." />}
           {toVerifyData.map((rx) => (
             <div key={rx.id} style={{ background: "#FFFFFF", borderRadius: 8, overflow: "hidden", border: "1px solid #D0D8E0" }}>
-              <div style={{ background: "#143520", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 600 }}>{rx.patient}</span>
-                <span style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 1 }}>{rx.lane?.toUpperCase()}</span>
+              <div style={{ background: "#0B1F3A", padding: "5px 10px 5px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 700 }}>{rx.patient}</span>
+                <span style={{ ...TM, color: "#7EB8C9", fontSize: 8 }}>Rx#{rx.rxNum}</span>
+              </div>
+              <div style={{ background: "#F8F9FA", padding: "4px 10px", borderBottom: "1px solid #E8EDF1", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ ...TM, fontSize: 8, color: "#5A7080" }}>{rx.insurancePlan || "Cash"}</span>
+                <span style={{ ...TM, fontSize: 7, color: rx.lane === "Drive-thru" ? "#FFB800" : rx.lane === "Waiter" ? "#FF4444" : "#3FB950", fontWeight: 700 }}>{rx.lane?.toUpperCase()}</span>
               </div>
               <div style={{ padding: "8px 10px 10px" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
-                <div style={{ ...TM, color: "#5A7080", fontSize: 10, marginTop: 3 }}>Qty {rx.qty} · {rx.sig}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A2A35" }}>{rx.drug}</div>
+                <div style={{ ...TM, fontSize: 10, color: "#3A5060", marginTop: 1 }}>{rx.strength} · #{rx.qty}</div>
+                <div style={{ ...TM, fontSize: 9, color: "#8A9AAA", marginTop: 2, lineHeight: 1.3 }}>{rx.sig}</div>
                 <PressureMeter rx={rx} />
-                <button onClick={() => setVerifyModal({ rx, stage: "qv1" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "8px 0", background: "#0B1F3A", color: "#7EB8C9", border: "1px solid rgba(126,184,201,0.25)", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
-                  VIEW SCRIPT &amp; VERIFY ▶
+                <button onClick={() => setVerifyModal({ rx, stage: "qv1" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: "#CC0000", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                  QV1 — VIEW &amp; VERIFY ▶
                 </button>
               </div>
             </div>
@@ -5430,20 +5466,23 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
         <Column title="QV2 FINAL CHECK" count={finalCheck.length} color="#7EB8C9">
           {!finalCheck.length && <EmptyLane text="No filled vials ready yet." />}
           {finalCheck.map((rx) => {
-            const f = rx.fillCase.fill;
             const needsReject = rx.fillCase.errorField !== null;
             return (
               <div key={rx.id} style={{ background: "#FFFFFF", borderRadius: 8, overflow: "hidden", border: `1px solid ${needsReject ? "#FFB80066" : "#D0D8E0"}` }}>
-                <div style={{ background: needsReject ? "#2A1A00" : "#0B2A3F", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 600 }}>{rx.patient}</span>
-                  <span style={{ ...TM, color: needsReject ? "#FFB800" : "#7EB8C9", fontSize: 8, letterSpacing: 1 }}>{needsReject ? "⚠ CHECK" : "QV2"}</span>
+                <div style={{ background: needsReject ? "#3A1A00" : "#0B1F3A", padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 700 }}>{rx.patient}</span>
+                  <span style={{ ...TM, color: needsReject ? "#FFB800" : "#7EB8C9", fontSize: 8 }}>Rx#{rx.rxNum}</span>
+                </div>
+                <div style={{ background: "#F8F9FA", padding: "4px 10px", borderBottom: "1px solid #E8EDF1", display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ ...TM, fontSize: 8, color: "#5A7080" }}>{rx.insurancePlan || "Cash"}</span>
+                  <span style={{ ...TM, fontSize: 7, color: needsReject ? "#FFB800" : "#3FB950", fontWeight: 700 }}>{needsReject ? "⚠ FILL ERROR" : "READY FOR RPH"}</span>
                 </div>
                 <div style={{ padding: "8px 10px 10px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
-                  <div style={{ ...TM, color: "#5A7080", fontSize: 10, marginTop: 2 }}>Qty: #{rx.qty} · {rx.lane?.toUpperCase()}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1A2A35" }}>{rx.drug}</div>
+                  <div style={{ ...TM, fontSize: 10, color: "#3A5060", marginTop: 1 }}>{rx.strength} · #{rx.qty}</div>
                   <PressureMeter rx={rx} />
-                  <button onClick={() => setVerifyModal({ rx, stage: "qv2" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: needsReject ? "rgba(255,184,0,0.1)" : "#0B1F3A", color: needsReject ? "#FFB800" : "#7EB8C9", border: `1px solid ${needsReject ? "#FFB80055" : "rgba(126,184,201,0.25)"}`, borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
-                    {needsReject ? "⚠ OPEN FINAL CHECK" : "OPEN FINAL CHECK ▶"}
+                  <button onClick={() => setVerifyModal({ rx, stage: "qv2" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: needsReject ? "#FFB800" : "#CC0000", color: needsReject ? "#3A2800" : "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                    {needsReject ? "⚠ QV2 — INSPECT FILL" : "QV2 — FINAL CHECK ▶"}
                   </button>
                 </div>
               </div>
