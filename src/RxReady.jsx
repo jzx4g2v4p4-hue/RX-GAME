@@ -2967,116 +2967,156 @@ function TheShift({ level, onHome, best, setBest, onShiftEnd, narratorMode, spee
 
   /* ---------- LIVE SHIFT ---------- */
   const active = queue[0];
-  const clockColor = clock <= 20 ? C.clay : C.pine;
-  const repColor = rep >= 60 ? C.green : rep >= 30 ? C.amber : C.clay;
+  const clockColor = clock <= 20 ? "#FF4444" : clock <= 60 ? "#FFB800" : "#3FB950";
+  const repColor = rep >= 60 ? "#3FB950" : rep >= 30 ? "#FFB800" : "#FF4444";
   const mm = Math.floor(clock / 60), ss = String(clock % 60).padStart(2, "0");
+  const TF = { fontFamily: "'Spline Sans Mono',monospace" };
+
+  // Simulated station queue counts (shift from real queue length)
+  const simQt  = Math.max(0, queue.length + Math.floor(served * 0.6));
+  const simQv1 = Math.max(0, Math.floor(served * 0.3));
+  const simQp  = Math.max(0, Math.floor(served * 0.2));
+  const simQv2 = Math.max(0, Math.floor(served * 0.1));
 
   return (
-    <div className="rise">
-      {/* top HUD */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-          <div>
-            <div className="display" style={{ fontSize: 22, fontWeight: 900, color: C.green, lineHeight: 1, position: "relative" }}>
-              ${cash}
-              {gain > 0 && <span className="pop" style={{ position: "absolute", left: "100%", top: -2, marginLeft: 6, fontSize: 13, color: C.green, whiteSpace: "nowrap" }}>+${gain}</span>}
-            </div>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.muted }}>Tips</div>
-          </div>
-          {combo > 1 && <div className="pop" key={combo} style={{ fontFamily: "'Fraunces',serif", fontWeight: 900, fontSize: 18, color: C.amber }}>×{combo} combo</div>}
+    <div style={{ fontFamily: "'Spline Sans',sans-serif" }}>
+      {/* ── RXPRO SHIFT HEADER ── */}
+      <div style={{ background: "#0B1F3A", borderRadius: "14px 14px 0 0", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ ...TF, color: "#4A8FA5", fontSize: 8, letterSpacing: 2 }}>RXPRO — SHIFT IN PROGRESS</div>
+          <div style={{ ...TF, color: "#E8F4F8", fontSize: 12, fontWeight: 600, marginTop: 2 }}>STORE #{Math.floor(level * 1234 + 2847)} · THE COUNTER</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setMuted((m) => !m)} title="sound"
-            style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 9, padding: "5px 9px", cursor: "pointer", fontSize: 14, color: C.muted }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => setMuted((m) => !m)}
+            style={{ ...TF, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(126,184,201,0.2)", borderRadius: 7, padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#7EB8C9" }}>
             {muted ? "🔇" : "🔊"}
           </button>
           <div style={{ textAlign: "right" }}>
-            <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: clockColor, lineHeight: 1 }}>{mm}:{ss}</div>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.muted }}>Shift</div>
+            <div style={{ ...TF, fontSize: 18, fontWeight: 700, color: clockColor, lineHeight: 1 }}>{mm}:{ss}</div>
+            <div style={{ ...TF, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginTop: 2 }}>SHIFT CLOCK</div>
           </div>
         </div>
       </div>
 
-      {/* reputation bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.muted }}>Rep</span>
-        <div style={{ flex: 1, height: 8, background: C.paper2, borderRadius: 6, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${rep}%`, background: repColor, transition: "width .4s ease, background .4s ease" }} />
-        </div>
-        <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: repColor }}>{rep}</span>
-      </div>
-
-      {/* the line */}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 14, minHeight: 66 }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.muted, marginRight: 2, paddingBottom: 18 }}>Line</span>
-        {queue.length === 0 && <span style={{ fontSize: 13, color: C.muted, fontStyle: "italic", paddingBottom: 18 }}>quiet for a moment…</span>}
-        {queue.map((p, i) => {
-          const pc = p.patience > 60 ? C.green : p.patience > 30 ? C.amber : C.clay;
-          const px = i === 0 ? 3.6 : 2.7;
-          const sw = Math.round(12 * px);
-          return (
-            <div key={p.id} className="pop" style={{ textAlign: "center", opacity: i === 0 ? 1 : 0.8 }}>
-              <div style={{ height: 11, fontSize: 10, color: C.amber, lineHeight: 1 }}>{i === 0 ? "▾" : ""}</div>
-              <div style={{ height: Math.round(14 * px), display: "flex", alignItems: "flex-end", justifyContent: "center",
-                filter: i === 0 ? "drop-shadow(0 2px 0 rgba(192,120,30,0.45))" : "none" }}>
-                <PixelSprite grid={p.look.grid} colors={p.look.colors} px={px} />
-              </div>
-              <div style={{ width: sw, height: 3, borderRadius: 3, background: C.paper2, margin: "4px auto 0", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.max(0, p.patience)}%`, background: pc, transition: "width 1s linear" }} />
-              </div>
+      {/* ── FLOOR STATUS STRIP ── */}
+      <div style={{ background: "#0F2A3F", padding: "10px 16px", borderTop: "1px solid rgba(126,184,201,0.1)", borderRadius: "0 0 12px 12px", marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr) 1fr", gap: 7 }}>
+          {[
+            { k: "QT",  v: simQt,  hi: 12 },
+            { k: "QV1", v: simQv1, hi: 6  },
+            { k: "QP",  v: simQp,  hi: 5  },
+            { k: "QV2", v: simQv2, hi: 4  },
+          ].map(({ k, v, hi }) => (
+            <div key={k} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "6px 4px", textAlign: "center" }}>
+              <div style={{ ...TF, color: v >= hi ? "#FF4444" : "#3FB950", fontSize: 15, fontWeight: 700, lineHeight: 1 }}>{v}</div>
+              <div style={{ ...TF, color: "#3A6070", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
             </div>
-          );
-        })}
+          ))}
+          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "6px 8px" }}>
+            <div style={{ ...TF, color: rep >= 60 ? "#3FB950" : rep >= 30 ? "#FFB800" : "#FF4444", fontSize: 10, fontWeight: 700, lineHeight: 1 }}>REP</div>
+            <div style={{ marginTop: 4, height: 4, background: "rgba(0,0,0,0.4)", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${rep}%`, background: repColor, transition: "width .4s ease" }} />
+            </div>
+          </div>
+        </div>
+
+        {/* cash + combo strip */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div>
+              <span style={{ ...TF, fontSize: 16, fontWeight: 700, color: "#3FB950", position: "relative" }}>
+                ${cash}
+                {gain > 0 && <span className="pop" style={{ position: "absolute", left: "100%", top: -2, marginLeft: 6, fontSize: 11, color: "#3FB950", whiteSpace: "nowrap" }}>+${gain}</span>}
+              </span>
+              <span style={{ ...TF, fontSize: 8, color: "#4A8FA5", marginLeft: 6 }}>TIPS EARNED</span>
+            </div>
+            {combo > 1 && (
+              <div className="pop" key={combo} style={{ ...TF, background: "rgba(255,184,0,0.15)", border: "1px solid rgba(255,184,0,0.4)", borderRadius: 6, padding: "3px 8px", fontSize: 10, color: "#FFB800" }}>
+                ×{combo} COMBO
+              </div>
+            )}
+          </div>
+          <div style={{ ...TF, fontSize: 9, color: "#4A8FA5" }}>{served} served · {errors} errors</div>
+        </div>
       </div>
 
-      {/* the window */}
+      {/* ── PATIENT QUEUE ── */}
+      <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "10px 14px", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <span style={{ ...TF, fontSize: 8, color: "#6E7C70", letterSpacing: 1.5 }}>COUNTER QUEUE</span>
+          <span style={{ ...TF, fontSize: 8, color: queue.length >= 5 ? "#B23A24" : "#6E7C70" }}> · {queue.length} waiting</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 7, minHeight: 62, flexWrap: "nowrap", overflowX: "auto" }}>
+          {queue.length === 0 && <span style={{ fontSize: 12, color: "#6E7C70", fontStyle: "italic", paddingBottom: 14 }}>Counter clear — quiet moment…</span>}
+          {queue.map((p, i) => {
+            const pc = p.patience > 60 ? C.green : p.patience > 30 ? C.amber : C.clay;
+            const px = i === 0 ? 3.6 : 2.4;
+            const sw = Math.round(12 * px);
+            return (
+              <div key={p.id} className="pop" style={{ textAlign: "center", flexShrink: 0, opacity: i === 0 ? 1 : 0.75 }}>
+                {i === 0 && <div style={{ fontSize: 10, color: C.amber, lineHeight: 1, marginBottom: 1 }}>▾</div>}
+                <div style={{ height: Math.round(14 * px), display: "flex", alignItems: "flex-end", justifyContent: "center",
+                  filter: i === 0 ? "drop-shadow(0 2px 0 rgba(192,120,30,0.45))" : "none" }}>
+                  <PixelSprite grid={p.look.grid} colors={p.look.colors} px={px} />
+                </div>
+                <div style={{ width: sw, height: 3, borderRadius: 3, background: "#D9D1C0", margin: "4px auto 0", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.max(0, p.patience)}%`, background: pc, transition: "width 1s linear" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── COUNTER WINDOW ── */}
       {active ? (
-        <div className="rx-card pop" key={active.id} style={{ padding: 20,
-          border: `1px solid ${feedback ? (feedback.correct ? C.green : C.clay) : C.line}`,
-          background: feedback ? (feedback.correct ? "rgba(46,139,87,0.06)" : "rgba(178,58,36,0.05)") : C.card,
-          transition: "background .2s, border-color .2s" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ display: "block" }}><PixelSprite grid={active.look.grid} colors={active.look.colors} px={3} /></span>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>{active.name}</span>
-            </span>
-            <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: tagColor(active.task.tag), border: `1px solid ${tagColor(active.task.tag)}`, borderRadius: 20, padding: "3px 9px" }}>{active.task.tag}</span>
-          </div>
-          <h3 style={{ fontSize: 16.5, fontWeight: 700, margin: "0 0 14px", lineHeight: 1.35 }}>{active.task.q}</h3>
-          <div style={{ display: "grid", gap: 8 }}>
-            {active.task.options.map((opt, i) => {
-              let bg = C.card, border = C.line, color = C.ink;
-              if (feedback) {
-                if (i === feedback.answer) { bg = "rgba(46,139,87,0.16)"; border = C.green; }
-                else if (i === feedback.sel) { bg = "rgba(178,58,36,0.12)"; border = C.clay; }
-              }
-              return (
-                <button key={i} className="opt" disabled={!!feedback} onClick={() => answer(i)}
-                  style={{ textAlign: "left", background: bg, border: `1.5px solid ${border}`, color, borderRadius: 12,
-                    padding: "11px 14px", cursor: feedback ? "default" : "pointer", fontSize: 14.5, lineHeight: 1.4 }}>
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-          {feedback && (
-            <div className="pop" style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.5, color: feedback.correct ? C.green : C.ink }}>
-              <strong style={{ color: feedback.correct ? C.green : C.clay }}>{feedback.correct ? "✓ " : "✕ "}</strong>{active.task.explain}
+        <div key={active.id} style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${feedback ? (feedback.correct ? "#3FB950" : C.clay) : "rgba(31,74,63,0.16)"}`, transition: "border-color .2s" }}>
+          {/* Terminal header */}
+          <div style={{ background: "#0B1F3A", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <PixelSprite grid={active.look.grid} colors={active.look.colors} px={2.5} />
+              <span style={{ ...TF, color: "#E8F4F8", fontSize: 12, fontWeight: 600 }}>{active.name}</span>
             </div>
-          )}
+            <span style={{ ...TF, fontSize: 8, letterSpacing: 1.5, color: tagColor(active.task.tag), background: `${tagColor(active.task.tag)}22`, border: `1px solid ${tagColor(active.task.tag)}66`, borderRadius: 5, padding: "3px 7px" }}>{active.task.tag}</span>
+          </div>
+          {/* Question body */}
+          <div style={{ background: feedback ? (feedback.correct ? "rgba(46,139,87,0.06)" : "rgba(178,58,36,0.05)") : C.card, padding: "16px 16px 14px", transition: "background .2s" }}>
+            <h3 style={{ fontSize: 15.5, fontWeight: 700, margin: "0 0 12px", lineHeight: 1.4, color: C.ink }}>{active.task.q}</h3>
+            <div style={{ display: "grid", gap: 7 }}>
+              {active.task.options.map((opt, i) => {
+                let bg = C.paper, border = C.line, color = C.ink;
+                if (feedback) {
+                  if (i === feedback.answer) { bg = "rgba(46,139,87,0.16)"; border = C.green; }
+                  else if (i === feedback.sel) { bg = "rgba(178,58,36,0.12)"; border = C.clay; }
+                }
+                return (
+                  <button key={i} className="opt" disabled={!!feedback} onClick={() => answer(i)}
+                    style={{ textAlign: "left", background: bg, border: `1.5px solid ${border}`, color, borderRadius: 10,
+                      padding: "10px 13px", cursor: feedback ? "default" : "pointer", fontSize: 14, lineHeight: 1.4 }}>
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+            {feedback && (
+              <div className="pop" style={{ marginTop: 11, fontSize: 13, lineHeight: 1.5, color: feedback.correct ? C.green : C.ink, padding: "9px 12px", borderRadius: 8, background: feedback.correct ? "rgba(46,139,87,0.08)" : "rgba(178,58,36,0.07)", border: `1px solid ${feedback.correct ? C.green : C.clay}33` }}>
+                <strong style={{ color: feedback.correct ? C.green : C.clay }}>{feedback.correct ? "✓ " : "✕ "}</strong>{active.task.explain}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        <div className="rx-card" style={{ padding: 28, textAlign: "center", color: C.muted, fontStyle: "italic" }}>
-          Counter's clear — next patient walking up…
+        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
+          <div style={{ ...TF, color: "#3FB950", fontSize: 9, letterSpacing: 2, marginBottom: 6 }}>● COUNTER CLEAR</div>
+          <div style={{ ...TF, color: "#4A8FA5", fontSize: 11 }}>Next patient walking up…</div>
         </div>
       )}
 
-      {/* Zippo narrator corner */}
+      {/* ── NARRATOR STRIP ── */}
       {narratorQuip && (
         <div className="pop" style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 10,
-          padding: "10px 14px", borderRadius: 12, background: "rgba(31,74,63,0.07)",
-          border: `1px dashed ${C.line}` }}>
-          <svg width={30} height={22} viewBox="0 0 10 11" style={{ shapeRendering: "crispEdges", flexShrink: 0, marginTop: 2 }}>
+          padding: "9px 13px", borderRadius: 10, background: "rgba(11,31,58,0.06)", border: `1px dashed ${C.line}` }}>
+          <svg width={28} height={20} viewBox="0 0 10 11" style={{ shapeRendering: "crispEdges", flexShrink: 0, marginTop: 1 }}>
             {ZIPPO_GRID.map((row, r) => row.map((k, c) => (
               k ? <rect key={`${r}-${c}`} x={c} y={r} width={1.05} height={1.05} fill={ZIPPO_COLORS[k]} /> : null
             )))}
@@ -3088,8 +3128,8 @@ function TheShift({ level, onHome, best, setBest, onShiftEnd, narratorMode, spee
         </div>
       )}
 
-      <button onClick={endShift} style={btn("transparent", C.muted, { border: `1px solid ${C.line}`, width: "100%", marginTop: 14, fontSize: 13 })}>
-        End shift early
+      <button onClick={endShift} style={btn("transparent", C.muted, { border: `1px solid ${C.line}`, width: "100%", marginTop: 12, fontSize: 13 })}>
+        Clock out early
       </button>
     </div>
   );
@@ -5664,103 +5704,173 @@ function Header({ onHome, show, save }) {
 }
 
 /* ---------- Home ---------- */
+const RPH_NAMES = ["R. Martinez, PharmD", "J. Thompson, PharmD", "K. Williams, PharmD", "M. Nguyen, PharmD", "A. Patel, PharmD", "S. Johnson, PharmD"];
+const STATION_DESCS = {
+  QT: "Data Entry",
+  QV1: "Pharmacist Review",
+  QP: "Production / Fill",
+  QV2: "Final Verify",
+};
 function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, onSettings }) {
   const [showSched, setShowSched] = useState(false);
+  const [liveClock, setLiveClock] = useState(() => new Date());
+  const [termData] = useState(() => ({
+    storeNum: Math.floor(Math.random() * 8000 + 1000),
+    rph: RPH_NAMES[Math.floor(Math.random() * RPH_NAMES.length)],
+    qt: Math.floor(Math.random() * 14 + 4),
+    qv1: Math.floor(Math.random() * 7 + 1),
+    qp: Math.floor(Math.random() * 6 + 1),
+    qv2: Math.floor(Math.random() * 5 + 1),
+    drivethru: Math.floor(Math.random() * 5),
+    willcall: Math.floor(Math.random() * 18 + 8),
+    phones: Math.random() > 0.55,
+  }));
+  useEffect(() => {
+    const iv = setInterval(() => setLiveClock(new Date()), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const timeStr = liveClock.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const dayStr = liveClock.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+  const qColor = (n, lo, hi) => n >= hi ? "#FF4444" : n >= lo ? "#FFB800" : "#3FB950";
+  const T = { font: "'Spline Sans Mono',monospace" };
   return (
     <div className="rise">
-      <div style={{ textAlign: "center", margin: "6px 0 18px" }}>
-        <h1 className="pixel" style={{ fontSize: 26, color: C.pine, margin: "0 0 12px", lineHeight: 1.5, textShadow: `3px 3px 0 ${C.amberSoft}` }}>RxReady</h1>
-        <div className="pixel blink" style={{ fontSize: 9, color: C.amber }}>★ INSERT COIN · WORK THE COUNTER ★</div>
+      {/* ── RXPRO SYSTEM HEADER ── */}
+      <div style={{ borderRadius: "14px 14px 0 0", background: "#0B1F3A", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div>
+          <div style={{ fontFamily: T.font, color: "#7EB8C9", fontSize: 8, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 4 }}>RXPRO PHARMACY SYSTEM v4.2</div>
+          <div style={{ fontFamily: T.font, color: "#E8F4F8", fontSize: 13.5, fontWeight: 600, letterSpacing: 0.5 }}>STORE #{termData.storeNum}</div>
+          <div style={{ fontFamily: T.font, color: "#4A8FA5", fontSize: 10, marginTop: 2 }}>RPh ON DUTY: {termData.rph}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontFamily: T.font, color: "#E8F4F8", fontSize: 14, fontWeight: 600, letterSpacing: 1 }}>{timeStr}</div>
+          <div style={{ fontFamily: T.font, color: "#4A8FA5", fontSize: 9, letterSpacing: 1, marginTop: 2 }}>{dayStr}</div>
+        </div>
+      </div>
+
+      {/* ── PHARMACY FLOOR STATUS ── */}
+      <div style={{ background: "#0F2A3F", padding: "14px 18px 16px", marginBottom: 18, borderTop: "1px solid rgba(126,184,201,0.12)", borderRadius: "0 0 14px 14px" }}>
+        <div style={{ fontFamily: T.font, color: "#4A8FA5", fontSize: 8, letterSpacing: 2, marginBottom: 10 }}>▸ PHARMACY FLOOR STATUS</div>
+        {/* Queue station tiles */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 10 }}>
+          {[
+            { k: "QT",  v: termData.qt,  lo: 8,  hi: 14 },
+            { k: "QV1", v: termData.qv1, lo: 4,  hi: 7  },
+            { k: "QP",  v: termData.qp,  lo: 3,  hi: 5  },
+            { k: "QV2", v: termData.qv2, lo: 3,  hi: 5  },
+          ].map(({ k, v, lo, hi }) => {
+            const col = qColor(v, lo, hi);
+            return (
+              <div key={k} style={{ background: "rgba(0,0,0,0.35)", borderRadius: 8, padding: "9px 6px 7px", textAlign: "center", border: `1px solid ${col}44` }}>
+                <div style={{ fontFamily: T.font, color: col, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{v}</div>
+                <div style={{ fontFamily: T.font, color: col, fontSize: 9, letterSpacing: 1, marginTop: 2 }}>{k}</div>
+                <div style={{ fontFamily: T.font, color: "#3A6070", fontSize: 7, marginTop: 1 }}>{STATION_DESCS[k]}</div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Drive-thru / will-call / phones */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { label: "DRIVE-THRU", val: `${termData.drivethru} cars`, urgent: termData.drivethru >= 3 },
+            { label: "WILL-CALL",  val: `${termData.willcall} bags`, urgent: termData.willcall >= 22 },
+            { label: "PHONES",     val: termData.phones ? "RINGING" : "CLEAR", urgent: termData.phones, blink: termData.phones },
+          ].map(({ label, val, urgent, blink }) => (
+            <div key={label} style={{ flex: "1 1 90px", background: "rgba(0,0,0,0.3)", borderRadius: 8, padding: "7px 10px", display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontFamily: T.font, color: "#3A6070", fontSize: 7, letterSpacing: 1.5 }}>{label}</span>
+              <span className={blink ? "blink" : ""} style={{ fontFamily: T.font, color: urgent ? "#FF4444" : "#3FB950", fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{val}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {save && save.shifts > 0 && (
-        <div className="rx-card" style={{ padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 11, background: C.pine, color: C.paper,
-            display: 'grid', placeItems: 'center', fontFamily: "'Fraunces',serif",
-            fontSize: 22, fontWeight: 900, flexShrink: 0,
-          }}>℞</div>
+        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "12px 16px", marginBottom: 18, display: "flex", alignItems: "center", gap: 14, border: "1px solid rgba(63,185,80,0.2)" }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#143520", border: "1px solid rgba(63,185,80,0.3)", color: "#3FB950", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 20, fontWeight: 900, flexShrink: 0 }}>℞</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="display" style={{ fontWeight: 900, fontSize: 15.5, lineHeight: 1.2 }}>{getRank(save.lifetimeEarned)}</div>
-            <div className="mono" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-              {save.shifts} shift{save.shifts !== 1 ? 's' : ''} · ${save.lifetimeEarned} earned
+            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontWeight: 600, fontSize: 12, color: "#E8F4F8", lineHeight: 1.2 }}>{getRank(save.lifetimeEarned)}</div>
+            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 9, color: "#4A8FA5", marginTop: 3, letterSpacing: 0.5 }}>
+              {save.shifts} SHIFT{save.shifts !== 1 ? "S" : ""} · ${save.lifetimeEarned} EARNED
             </div>
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div className="display" style={{ fontSize: 22, fontWeight: 900, color: C.green, lineHeight: 1 }}>${save.currency}</div>
-            <div className="mono" style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>balance</div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 20, fontWeight: 700, color: "#3FB950", lineHeight: 1 }}>${save.currency}</div>
+            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 8, color: "#4A8FA5", marginTop: 3, letterSpacing: 1 }}>BALANCE</div>
           </div>
         </div>
       )}
 
-      {/* HERO — The Shift = PLAY */}
-      {(() => {
-        const shift = modeById(14);
-        return (
-          <button onClick={() => onPick(14)} className="lift hero-pulse"
-            style={{ width: "100%", textAlign: "left", cursor: "pointer", border: `2px solid ${C.amber}`, borderRadius: 18,
-              padding: 22, marginBottom: 22, color: C.paper, position: "relative", overflow: "hidden",
-              background: `linear-gradient(135deg, ${C.pine}, ${C.pineSoft})` }}>
-            <div style={{ position: "absolute", right: -20, top: -20, fontSize: 150, opacity: 0.08, fontFamily: "'Fraunces',serif" }}>℞</div>
-            <div className="pixel" style={{ fontSize: 8, color: C.amberSoft, marginBottom: 12 }}>▶ SHIFT SIM</div>
-            <div className="pixel" style={{ fontSize: 20, lineHeight: 1.4, marginBottom: 12 }}>CAREER MODE</div>
-            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, opacity: 0.9, maxWidth: 460 }}>Run the whole retail pharmacy loop: QT/QV1/QP/QV2 queues, phones, pickup, drive-thru, waiters, counseling, metrics, and final-check pressure.</p>
-            <div className="pixel blink" style={{ display: "inline-block", marginTop: 16, background: C.amber, color: C.paper, borderRadius: 6, padding: "10px 16px", fontSize: 11 }}>
-              ▶ CLOCK IN
-            </div>
-          </button>
-        );
-      })()}
+      {/* HERO — The Shift = CLOCK IN */}
+      <button onClick={() => onPick(14)} className="lift"
+        style={{ width: "100%", textAlign: "left", cursor: "pointer", border: "2px solid #3FB950", borderRadius: 14,
+          padding: 0, marginBottom: 22, color: "#E8F4F8", position: "relative", overflow: "hidden",
+          background: "#0B1F3A", boxShadow: "0 4px 24px -8px rgba(63,185,80,0.35)" }}>
+        <div style={{ background: "#143520", padding: "10px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(63,185,80,0.2)" }}>
+          <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#3FB950", fontSize: 9, letterSpacing: 2 }}>ACTION REQUIRED</span>
+          <span className="blink" style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#3FB950", fontSize: 9, letterSpacing: 2 }}>● STATION READY</span>
+        </div>
+        <div style={{ padding: "18px 18px 20px" }}>
+          <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#7EB8C9", fontSize: 10, letterSpacing: 1.5, marginBottom: 6 }}>CAREER MODE — FULL SHIFT SIMULATION</div>
+          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 22, fontWeight: 900, color: "#E8F4F8", marginBottom: 10 }}>Clock In &amp; Run the Floor</div>
+          <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.55, color: "#7EB8C9", maxWidth: 460 }}>Full CVS retail pharmacy loop — QT intake, QV1 review, fill, QV2 final check, drive-thru, phones, pickups, waiters, and counseling.</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: "#3FB950", color: "#0B1F3A", borderRadius: 8, padding: "10px 18px" }}>
+            <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>▶ CLOCK IN — START FULL SHIFT</span>
+          </div>
+        </div>
+      </button>
 
-      <div className="pixel" style={{ fontSize: 10, color: C.pine, marginBottom: 14 }}>▸ STAGE SELECT</div>
-      <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
-        {MODE_GROUPS.map((group, gi) => (
-          <div key={group.id} className="rx-card lift" style={{ padding: 18, background: C.card }}>
-            <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 14 }}>
-              <button onClick={() => onPick(group.lead)}
-                style={{
-                  border: "none", cursor: "pointer", minWidth: 58, height: 58, borderRadius: 14,
-                  background: gi === 0 ? C.amber : C.pine, color: C.paper, display: "grid", placeItems: "center",
-                  fontSize: 25, fontFamily: "'Fraunces',serif", fontWeight: 900,
-                }}>
-                {String(gi + 1).padStart(2, "0")}
-              </button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span className="display" style={{ fontSize: 22, fontWeight: 900 }}>{group.title}</span>
-                  <span className="mono" style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.amber, border: "1px solid " + C.amberSoft, borderRadius: 20, padding: "3px 9px" }}>{group.tag}</span>
+      {/* ── STATION SELECT ── */}
+      <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5, marginBottom: 12 }}>▸ SELECT TRAINING STATION</div>
+      <div style={{ display: "grid", gap: 12, marginBottom: 14 }}>
+        {MODE_GROUPS.map((group, gi) => {
+          const groupColors = ["#C0781E", "#1F4A3F", "#1A0808", "#2A1060"];
+          const groupAccents = ["#E2A552", "#3FB950", "#FF6B6B", "#A070FF"];
+          const gc = groupColors[gi] || "#1F4A3F";
+          const ga = groupAccents[gi] || "#7EB8C9";
+          return (
+            <div key={group.id} style={{ borderRadius: 14, overflow: "hidden", border: `1px solid ${ga}33` }}>
+              {/* Station header */}
+              <div style={{ background: gc, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => onPick(group.lead)}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: ga, fontSize: 20, fontWeight: 700, lineHeight: 1, minWidth: 32 }}>{String(gi + 1).padStart(2,"0")}</div>
+                  <div>
+                    <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#E8F4F8", fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{group.title}</div>
+                    <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: ga, fontSize: 8, letterSpacing: 1.5, marginTop: 2 }}>{group.tag}</div>
+                  </div>
                 </div>
-                <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 14.5, lineHeight: 1.5 }}>{group.desc}</p>
+                <div style={{ fontFamily: "'Spline Sans Mono',monospace", color: ga, fontSize: 18 }}>›</div>
+              </div>
+              {/* Mode rows */}
+              <div style={{ background: C.card }}>
+                {group.modes.map((id, mi) => {
+                  const m = modeById(id);
+                  const isLead = id === group.lead;
+                  return (
+                    <button key={id} onClick={() => onPick(id)}
+                      style={{
+                        width: "100%", textAlign: "left", border: "none",
+                        borderTop: mi === 0 ? "none" : `1px solid ${C.line}`,
+                        background: isLead ? `${ga}12` : "transparent",
+                        color: C.ink, padding: "11px 14px", cursor: "pointer",
+                        display: "grid", gridTemplateColumns: "32px 1fr auto", gap: 10, alignItems: "center",
+                      }}>
+                      <span style={{
+                        width: 32, height: 32, borderRadius: 9, background: isLead ? gc : C.paper2,
+                        color: isLead ? "#E8F4F8" : C.pine, display: "grid", placeItems: "center",
+                        fontFamily: "'Fraunces',serif", fontWeight: 900, fontSize: 16,
+                      }}>{m.icon}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontWeight: 700, fontSize: 14.5, lineHeight: 1.2 }}>{m.title}</span>
+                        <span style={{ display: "block", color: C.muted, fontSize: 11.5, lineHeight: 1.3, marginTop: 1 }}>{m.tag}</span>
+                      </span>
+                      <span style={{ color: isLead ? ga : C.amber, fontSize: 18, lineHeight: 1 }}>›</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            <div style={{ display: "grid", gap: 9 }}>
-              {group.modes.map((id) => {
-                const m = modeById(id);
-                return (
-                  <button key={id} onClick={() => onPick(id)}
-                    style={{
-                      border: "1px solid " + (id === group.lead ? C.amberSoft : C.line),
-                      background: id === group.lead ? "rgba(192,120,30,0.10)" : C.paper,
-                      color: C.ink, borderRadius: 12, padding: "11px 12px", cursor: "pointer",
-                      display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 10, alignItems: "center", textAlign: "left",
-                    }}>
-                    <span style={{
-                      width: 34, height: 34, borderRadius: 10, background: id === group.lead ? C.amber : C.paper2,
-                      color: id === group.lead ? C.paper : C.pine, display: "grid", placeItems: "center",
-                      fontFamily: "'Fraunces',serif", fontWeight: 900, fontSize: 17,
-                    }}>{m.icon}</span>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: "block", fontWeight: 800, fontSize: 15.5 }}>{m.title}</span>
-                      <span style={{ display: "block", color: C.muted, fontSize: 12.5, lineHeight: 1.35 }}>{m.tag}</span>
-                    </span>
-                    <span style={{ color: C.amber, fontSize: 20, lineHeight: 1 }}>&gt;</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div style={{ display: "none" }}>
         {MODES.filter((m) => m.id !== 9).map((m, i) => (
@@ -5786,16 +5896,21 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
 
       {/* drug reference */}
       <button onClick={onReference} className="lift"
-        style={{ width: "100%", marginTop: 14, padding: "16px 18px", borderRadius: 16, cursor: "pointer",
-          background: C.pine, color: C.paper, border: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 22, fontFamily: "'Fraunces',serif" }}>🔍︎</span>
-          <span style={{ textAlign: "left" }}>
-            <span className="display" style={{ fontSize: 18, fontWeight: 900, display: "block" }}>Drug Reference</span>
-            <span style={{ fontSize: 13, opacity: 0.85 }}>Look up any of the top dispensed drugs</span>
+        style={{ width: "100%", marginTop: 4, padding: 0, borderRadius: 12, cursor: "pointer",
+          background: "#0B1F3A", color: "#E8F4F8", border: "1px solid rgba(126,184,201,0.25)", overflow: "hidden", textAlign: "left" }}>
+        <div style={{ background: "#0F2A3F", padding: "8px 16px", borderBottom: "1px solid rgba(126,184,201,0.1)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#7EB8C9", fontSize: 8, letterSpacing: 2 }}>REFERENCE TERMINAL</span>
+        </div>
+        <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontFamily: "'Fraunces',serif", fontSize: 22 }}>℞</span>
+            <span>
+              <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 13, fontWeight: 600, display: "block", color: "#E8F4F8" }}>Drug Reference</span>
+              <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 9, color: "#4A8FA5", marginTop: 2, display: "block" }}>Top-dispensed drugs · interactions · counseling</span>
+            </span>
           </span>
-        </span>
-        <span style={{ fontSize: 20 }}>›</span>
+          <span style={{ color: "#7EB8C9", fontSize: 18 }}>›</span>
+        </div>
       </button>
 
       {/* quick reference */}
@@ -5844,17 +5959,22 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
 
       {/* After Hours */}
       <button onClick={onAfterHours} className="lift"
-        style={{ width: "100%", marginTop: 14, padding: "16px 18px", borderRadius: 16, cursor: "pointer",
-          background: `linear-gradient(135deg, #3A1A4A, #1F2A5A)`, color: C.paper,
-          border: `1px solid rgba(192,120,30,0.4)`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 22 }}>★</span>
-          <span style={{ textAlign: "left" }}>
-            <span className="pixel" style={{ fontSize: 10, display: "block", marginBottom: 4 }}>AFTER HOURS</span>
-            <span style={{ fontSize: 13, opacity: 0.85 }}>Life sim · dating · RPG stats · spend your shift earnings</span>
+        style={{ width: "100%", marginTop: 12, padding: 0, borderRadius: 12, cursor: "pointer",
+          background: "linear-gradient(135deg, #1A0830, #0D1A3A)", color: C.paper,
+          border: "1px solid rgba(160,112,255,0.3)", overflow: "hidden", textAlign: "left" }}>
+        <div style={{ background: "rgba(160,112,255,0.12)", padding: "8px 16px", borderBottom: "1px solid rgba(160,112,255,0.12)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: "#A070FF", fontSize: 8, letterSpacing: 2 }}>OFF THE CLOCK</span>
+        </div>
+        <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 20 }}>★</span>
+            <span>
+              <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 13, fontWeight: 600, display: "block" }}>After Hours</span>
+              <span style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 9, color: "#A070FF", marginTop: 2, display: "block" }}>Life sim · dating · RPG stats · spend your earnings</span>
+            </span>
           </span>
-        </span>
-        <span style={{ fontSize: 20, color: C.amber }}>›</span>
+          <span style={{ color: "#A070FF", fontSize: 18 }}>›</span>
+        </div>
       </button>
 
       {/* Settings */}
