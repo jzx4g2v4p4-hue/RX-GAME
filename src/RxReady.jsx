@@ -2501,12 +2501,15 @@ function InsuranceDesk({ level, onFinish, onQuit }) {
   const [locked, setLocked] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [total, setTotal] = useState(0);
+  const [shift] = useState(() => SHIFT_CONTEXTS[Math.floor(Math.random() * SHIFT_CONTEXTS.length)]);
+  const [claimNums] = useState(() => Array.from({ length: 20 }, () => `CLM-${Math.floor(100000 + Math.random() * 899999)}`));
 
   const c = cases[ci];
   if (!c) return <Empty onQuit={onQuit} />;
   const step = c.steps[si];
   const totalSteps = cases.reduce((n, x) => n + x.steps.length, 0);
   const doneSteps = cases.slice(0, ci).reduce((n, x) => n + x.steps.length, 0) + si;
+  const claimResolved = locked && si + 1 >= c.steps.length;
 
   function answer(i) {
     if (locked) return;
@@ -2521,31 +2524,73 @@ function InsuranceDesk({ level, onFinish, onQuit }) {
 
   return (
     <div className="rise">
+      {/* Shift status bar */}
+      <div style={{
+        background: "#0B1F3A", color: "#7EB8C9", borderRadius: 10,
+        padding: "7px 13px", marginBottom: 10,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5, gap: 8,
+      }}>
+        <span style={{ whiteSpace: "nowrap", opacity: 0.75 }}>● {shift.time}</span>
+        <span style={{ flex: 1, textAlign: "center", opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shift.banner}</span>
+        <span style={{ color: "rgba(126,184,201,0.6)", whiteSpace: "nowrap" }}>INS DESK</span>
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <span className="mono" style={{ fontSize: 12, color: C.muted }}>Claim {ci + 1} of {cases.length}</span>
         <span className="mono" style={{ fontSize: 12, color: C.pine, fontWeight: 600 }}>{correct}/{total} correct</span>
       </div>
       <ProgressBar value={(doneSteps / totalSteps) * 100} />
 
-      {/* claim ticket */}
-      <div className="rx-card" style={{ padding: 0, marginTop: 16, overflow: "hidden" }}>
-        <div style={{ padding: "14px 18px", fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ color: C.muted }}>{c.claim.patient}</div>
-          <div style={{ fontSize: 15.5, fontWeight: 600, color: C.ink }}>{c.claim.drug}</div>
-          <div style={{ color: C.muted }}>Plan: {c.claim.plan}</div>
-          <div style={{ color: C.muted }}>{c.claim.info}</div>
+      {/* PBM terminal card */}
+      <div style={{ borderRadius: 13, overflow: "hidden", marginTop: 14, border: "1.5px solid #4A0A0A", boxShadow: "0 4px 18px rgba(90,10,10,0.18)" }}>
+        {/* Terminal header */}
+        <div style={{
+          background: "#1A0808", padding: "8px 14px",
+          display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
+          fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5,
+        }}>
+          <span style={{ color: "#FF9A9A", fontWeight: 700, letterSpacing: 0.5 }}>PBM CLAIMS TERMINAL</span>
+          <span style={{ color: "rgba(255,154,154,0.45)", textAlign: "center" }}>PHARMACY DESK</span>
+          <span style={{ color: "#FF9A9A", textAlign: "right", opacity: 0.7 }}>{claimNums[ci]}</span>
         </div>
-        <div style={{ background: "rgba(178,58,36,0.10)", borderTop: `1px solid ${C.clay}`, color: C.clay,
-          padding: "10px 18px", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 16 }}>⛔</span>
-          <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>REJECTED · Code {c.code} — {c.reject}</span>
+        {/* Claim body */}
+        <div style={{ background: "#FAFAF7", padding: "13px 16px", fontFamily: "'Spline Sans Mono', monospace" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "max-content 1fr", columnGap: 12, rowGap: 3, fontSize: 11.5 }}>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>PATIENT</span>
+            <span style={{ color: "#1A2A24", fontWeight: 500 }}>{c.claim.patient}</span>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>DRUG</span>
+            <span style={{ color: "#1A2A24", fontWeight: 700, fontSize: 13 }}>{c.claim.drug}</span>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>PLAN</span>
+            <span style={{ color: "#1A2A24" }}>{c.claim.plan}</span>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>NOTE</span>
+            <span style={{ color: "#4A4A4A", fontStyle: "italic", fontSize: 11 }}>{c.claim.info}</span>
+          </div>
+        </div>
+        {/* Reject banner */}
+        <div style={{
+          background: claimResolved ? "#0a2e14" : "#3A0808",
+          borderTop: `1px solid ${claimResolved ? "#2E8B57" : "#8B2020"}`,
+          padding: "8px 14px", display: "flex", alignItems: "center", gap: 10,
+          fontFamily: "'Spline Sans Mono', monospace",
+          transition: "background .4s",
+        }}>
+          <span style={{ fontSize: 15 }}>{claimResolved ? "✓" : "⛔"}</span>
+          <div>
+            <span style={{ color: claimResolved ? "#5AE87A" : "#FF6B6B", fontWeight: 700, fontSize: 11 }}>
+              {claimResolved ? "RESOLVED — CLAIM REPROCESSING" : `REJECTED · CODE ${c.code} — ${c.reject.toUpperCase()}`}
+            </span>
+            {!claimResolved && (
+              <div style={{ color: "rgba(255,107,107,0.6)", fontSize: 10, marginTop: 1 }}>Action required before resubmission</div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* step */}
+      {/* Question card */}
       <div className="rx-card pop" key={`${ci}-${si}`} style={{ padding: 20, marginTop: 12 }}>
-        <div className="mono" style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: C.amber, marginBottom: 8 }}>
-          Step {si + 1} of {c.steps.length}
+        <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.amber, marginBottom: 8 }}>
+          ▸ Claims adjudication — step {si + 1} of {c.steps.length}
         </div>
         <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 16px", lineHeight: 1.35 }}>{step.prompt}</h3>
         <Options options={step.options} answer={step.answer} selected={selected} onSelect={answer} locked={locked} />
