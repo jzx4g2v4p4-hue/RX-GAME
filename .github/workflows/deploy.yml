@@ -23,6 +23,24 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Restore Vite source entry
+        run: |
+          cat > index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+              <meta name="description" content="RxReady, a pharmacy arcade simulator for data entry, verification, manager shifts, and career consequences." />
+              <title>RxReady Pharmacy Arcade</title>
+            </head>
+            <body>
+              <div id="root"></div>
+              <script type="module" src="/src/main.jsx"></script>
+            </body>
+          </html>
+          HTML
+
       - run: npm ci
       - run: npm run build
 
