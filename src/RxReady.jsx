@@ -3242,7 +3242,7 @@ const VFIELD_LABELS = { patient: "Patient name", dob: "Date of birth", prescribe
 function VerifyBench({ level, onFinish, onQuit }) {
   const [cases] = useState(() => shuffle(VBENCH.filter((c) => c.level <= level)).slice(0, 8));
   const [idx, setIdx] = useState(0);
-  const [pick, setPick] = useState(undefined); // field key, or '__verify__'
+  const [pick, setPick] = useState(undefined);
   const [locked, setLocked] = useState(false);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -3251,6 +3251,7 @@ function VerifyBench({ level, onFinish, onQuit }) {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideCode, setOverrideCode] = useState("");
   const [overrideError, setOverrideError] = useState("");
+  const [shift] = useState(() => SHIFT_CONTEXTS[Math.floor(Math.random() * SHIFT_CONTEXTS.length)]);
 
   if (!cases.length) return <Empty onQuit={onQuit} />;
   const c = cases[idx];
@@ -3280,147 +3281,201 @@ function VerifyBench({ level, onFinish, onQuit }) {
       setOverrideError("Code rejected. Enter the documented intervention code to release the DUR lock.");
       return;
     }
-    setOverrideOpen(false);
-    setOverrideError("");
-    choose("__verify__");
+    setOverrideOpen(false); setOverrideError(""); choose("__verify__");
   }
 
-  // a tappable entry field
+  // Tappable field cell — styled like a POS data cell
   function F({ k, value }) {
     const isErr = c.errorField === k;
     const picked = pick === k;
-    let bg = "transparent", border = "transparent", color = C.ink;
-    if (!locked) border = "rgba(31,74,63,0.18)";
+    let bg = "#F0F5F8", border = "#C8D8E0", color = "#1A2A34";
+    if (!locked) { bg = "#EBF3F8"; border = "#6BA3BC"; }
     if (locked) {
-      if (isErr) { bg = "rgba(192,120,30,0.18)"; border = C.amber; }
-      else if (picked) { bg = "rgba(178,58,36,0.14)"; border = C.clay; }
+      if (isErr)   { bg = "#FFF3CD"; border = "#C0781E"; color = "#7A4400"; }
+      else if (picked) { bg = "#FDECEA"; border = "#B23A24"; color = "#7A1A0A"; }
+      else         { bg = "#F0F5F8"; border = "#C8D8E0"; }
     }
     return (
       <button disabled={locked} onClick={() => choose(k)} className="opt"
-        style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: 7, padding: "2px 7px",
-          cursor: locked ? "default" : "pointer", fontSize: 14, color, fontWeight: 500, textAlign: "left", lineHeight: 1.35 }}>
+        style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: 5, padding: "3px 8px",
+          cursor: locked ? "default" : "pointer", fontSize: 13.5, color, fontWeight: 600,
+          textAlign: "left", lineHeight: 1.3, fontFamily: "'Spline Sans Mono', monospace",
+          transition: "background .15s, border-color .15s" }}>
         {value}
       </button>
     );
   }
-  const Row = ({ label, children }) => (
-    <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 5 }}>
-      <span style={{ minWidth: 96, fontSize: 12.5, color: C.muted, fontWeight: 600 }}>{label}</span>
+
+  const SysRow = ({ label, children }) => (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, minHeight: 28 }}>
+      <span style={{ minWidth: 80, fontSize: 10, color: "#6A8A9C", fontWeight: 700, letterSpacing: 0.4, fontFamily: "'Spline Sans Mono', monospace", textTransform: "uppercase" }}>{label}</span>
       <span>{children}</span>
     </div>
   );
-  const Card = ({ title, children }) => (
-    <div className="rx-card" style={{ padding: 16, flex: "1 1 200px", minWidth: 0 }}>
-      <div className="display" style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>{title}</div>
+  const SysSection = ({ label, children }) => (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 9.5, color: "#4A7A94", fontWeight: 700, letterSpacing: 1, fontFamily: "'Spline Sans Mono', monospace", textTransform: "uppercase", marginBottom: 5, paddingBottom: 3, borderBottom: "1px solid #D0E4EC" }}>{label}</div>
       {children}
     </div>
   );
 
+  const isRight = pick !== undefined && (pick === "__verify__" ? c.errorField === null : pick === c.errorField);
+
   return (
     <div className="rise">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 16 }}>
-          <Stat label="Score" value={score} color={C.pine} />
-          <Stat label="Streak" value={`×${streak}`} color={C.amber} />
-        </div>
-        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Rx {idx + 1} / {cases.length}</span>
+      {/* Shift banner */}
+      <div style={{
+        background: "#0B1F3A", color: "#7EB8C9", borderRadius: 10,
+        padding: "7px 13px", marginBottom: 10,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5, gap: 8,
+      }}>
+        <span style={{ whiteSpace: "nowrap", opacity: 0.75 }}>● {shift.time}</span>
+        <span style={{ flex: 1, textAlign: "center", opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shift.banner}</span>
+        <span style={{ color: "rgba(126,184,201,0.6)", whiteSpace: "nowrap" }}>QV2 BENCH</span>
       </div>
+
+      {/* QV2 workstation header */}
+      <div style={{
+        background: "#0B1F3A", borderRadius: 10, padding: "8px 14px", marginBottom: 10,
+        display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
+        fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5,
+      }}>
+        <span style={{ color: "#7EB8C9", fontWeight: 700, letterSpacing: 0.5 }}>QV2 VERIFICATION BENCH</span>
+        <span style={{ color: "rgba(126,184,201,0.45)", textAlign: "center" }}>STATION 1</span>
+        <span style={{ color: "#7EB8C9", textAlign: "right", opacity: 0.75 }}>Rx {idx + 1}/{cases.length} · {correct} verified</span>
+      </div>
+
       <ProgressBar value={(idx / cases.length) * 100} />
 
-      <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 12px", lineHeight: 1.5 }}>
-        Compare the entry to the original. <strong style={{ color: C.ink }}>Tap the field that doesn't match</strong> — or verify if it's clean.
-      </p>
-
+      {/* DUR lock — red alert banner style */}
       {overrideRequired && (
-        <div className="rx-card pop" style={{ padding: 15, marginBottom: 12, border: `2px solid ${C.clay}`, background: "rgba(178,58,36,0.08)" }}>
-          <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.clay, marginBottom: 6 }}>DUR Lock</div>
-          <div style={{ fontWeight: 900, fontSize: 15.5, color: C.ink }}>{c.durOverride.title}</div>
-          <div style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.45, marginTop: 4 }}>{c.durOverride.profile}</div>
-          <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.45, marginTop: 4 }}>{c.durOverride.detail}</div>
+        <div className="pop" style={{
+          background: "#3A0808", borderRadius: 10, margin: "10px 0",
+          padding: "10px 14px", border: "1.5px solid #FF6B6B",
+          display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>⚠</span>
+          <div style={{ flex: 1, fontFamily: "'Spline Sans Mono', monospace" }}>
+            <div style={{ color: "#FF6B6B", fontWeight: 700, fontSize: 11, letterSpacing: 0.8 }}>[DUR-LOCK] {c.durOverride.title}</div>
+            <div style={{ color: "#FFCFC0", fontSize: 11, marginTop: 2 }}>{c.durOverride.profile}</div>
+            <div style={{ color: "rgba(255,207,192,0.75)", fontSize: 10.5, marginTop: 2 }}>{c.durOverride.detail}</div>
+            <div style={{ color: "rgba(255,107,107,0.55)", fontSize: 10, marginTop: 4 }}>Standard verification disabled — pharmacist DUR override required</div>
+          </div>
         </div>
       )}
 
-      {/* entry cards */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        <Card title="Patient">
-          <Row label="Name"><F k="patient" value={c.patient} /></Row>
-          <Row label="DOB"><F k="dob" value={c.dob} /></Row>
-          <Row label="Age / Sex"><span style={{ fontSize: 14 }}>{c.age} · {c.sex}</span></Row>
-        </Card>
-        <Card title="Prescriber">
-          <Row label="Name"><F k="prescriber" value={c.prescriber} /></Row>
-          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>{c.prescriberAddr}</div>
-        </Card>
-        <Card title="Product">
-          <Row label="Brand"><F k="brand" value={c.brand} /></Row>
-          <Row label="Generic"><F k="drug" value={c.generic} /></Row>
-          <Row label="Strength"><F k="strength" value={c.strength} /></Row>
-          <Row label="Mfr"><span style={{ fontSize: 13, color: C.muted }}>{c.manufacturer}</span></Row>
-        </Card>
+      {/* Instruction strip */}
+      <div style={{
+        background: "#EBF5F0", border: "1px solid #B0D4C4", borderRadius: 8,
+        padding: "7px 12px", marginBottom: 10,
+        fontFamily: "'Spline Sans Mono', monospace", fontSize: 11, color: "#1F4A3F",
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <span>▸</span>
+        <span><strong>Compare entry to hard copy.</strong> Tap the miskeyed field — or approve if everything checks out.</span>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
-        <Card title="Details">
-          <Row label="Written"><span style={{ fontSize: 14 }}>{c.writtenDate}</span></Row>
-          <Row label="Quantity"><F k="qty" value={c.qty} /></Row>
-          <Row label="Refills"><F k="refills" value={c.refills} /></Row>
-          <Row label="Days supply"><F k="daysSupply" value={c.daysSupply} /></Row>
-          <Row label="DAW code"><F k="daw" value={c.dawCode} /></Row>
-          <div style={{ marginTop: 8 }}>
-            <span style={{ fontSize: 12.5, color: C.muted, fontWeight: 600 }}>Directions</span>
-            <div style={{ marginTop: 4 }}><F k="directions" value={c.directions} /></div>
-          </div>
-        </Card>
+      {/* Main split: System Entry + Hard Copy */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
 
-        {/* original hard copy */}
-        <div className="rx-card" style={{ flex: "1 1 240px", minWidth: 0, padding: 0, overflow: "hidden", background: "#fffdf7" }}>
-          <div style={{ padding: "14px 16px 10px", textAlign: "center", borderBottom: "2px solid #2a2a33" }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#2a2a33" }}>{c.prescriber}</div>
-            <div style={{ fontSize: 11.5, color: "#666" }}>{c.prescriberAddr}</div>
+        {/* LEFT — System Entry (computer screen look) */}
+        <div style={{ flex: "1 1 220px", minWidth: 0, borderRadius: 10, overflow: "hidden", border: "1.5px solid #3A6A84" }}>
+          <div style={{ background: "#1A3A4A", padding: "7px 12px", fontFamily: "'Spline Sans Mono', monospace", fontSize: 10, fontWeight: 700, color: "#7EB8C9", letterSpacing: 0.8, display: "flex", justifyContent: "space-between" }}>
+            <span>▸ SYSTEM ENTRY (QT TYPED)</span>
+            <span style={{ opacity: 0.5 }}>PDX</span>
           </div>
-          <div style={{ padding: "12px 16px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-              <div><div style={{ fontSize: 10.5, color: "#888" }}>Patient</div><div style={hand}>{c.orig.patient}</div><div style={{ ...hand, fontSize: 16 }}>{c.orig.dob}</div></div>
-              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10.5, color: "#888" }}>Date</div><div style={hand}>{c.orig.date}</div></div>
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <div style={{ fontFamily: "'Fraunces',serif", fontSize: 34, fontWeight: 900, color: "#2a2a33", lineHeight: 0.9 }}>℞</div>
-              <div style={{ flex: 1, paddingTop: 4 }}>
-                <div style={{ ...hand, fontSize: 22, marginBottom: 8 }}>{c.orig.drug} {c.orig.strength}</div>
-                <div style={{ marginBottom: 5 }}><span style={{ fontSize: 12.5, color: "#666", fontWeight: 600 }}>Disp: </span><span style={hand}>{c.orig.disp}</span></div>
-                <div style={{ marginBottom: 5 }}><span style={{ fontSize: 12.5, color: "#666", fontWeight: 600 }}>Sig: </span><span style={hand}>{c.orig.sig}</span></div>
-                <div><span style={{ fontSize: 12.5, color: "#666", fontWeight: 600 }}>Refills: </span><span style={hand}>{c.orig.refills}</span></div>
+          <div style={{ background: "#F2F8FC", padding: "12px 14px" }}>
+            <SysSection label="Patient">
+              <SysRow label="Name"><F k="patient" value={c.patient} /></SysRow>
+              <SysRow label="DOB"><F k="dob" value={c.dob} /></SysRow>
+              <SysRow label="Age/Sex"><span style={{ fontSize: 13, color: "#1A2A34", fontFamily: "monospace" }}>{c.age} · {c.sex}</span></SysRow>
+            </SysSection>
+            <SysSection label="Prescriber">
+              <SysRow label="Name"><F k="prescriber" value={c.prescriber} /></SysRow>
+              <div style={{ fontSize: 10.5, color: "#6A8A9C", fontFamily: "monospace", paddingLeft: 86 }}>{c.prescriberAddr}</div>
+            </SysSection>
+            <SysSection label="Product">
+              <SysRow label="Brand"><F k="brand" value={c.brand} /></SysRow>
+              <SysRow label="Generic"><F k="drug" value={c.generic} /></SysRow>
+              <SysRow label="Strength"><F k="strength" value={c.strength} /></SysRow>
+              <SysRow label="Mfr"><span style={{ fontSize: 12, color: "#6A8A9C", fontFamily: "monospace" }}>{c.manufacturer}</span></SysRow>
+            </SysSection>
+            <SysSection label="Fill Details">
+              <SysRow label="Written"><span style={{ fontSize: 13, fontFamily: "monospace", color: "#1A2A34" }}>{c.writtenDate}</span></SysRow>
+              <SysRow label="Qty"><F k="qty" value={c.qty} /></SysRow>
+              <SysRow label="Refills"><F k="refills" value={c.refills} /></SysRow>
+              <SysRow label="Day Sply"><F k="daysSupply" value={c.daysSupply} /></SysRow>
+              <SysRow label="DAW"><F k="daw" value={c.dawCode} /></SysRow>
+              <div style={{ marginTop: 4 }}>
+                <div style={{ fontSize: 9.5, color: "#4A7A94", fontWeight: 700, letterSpacing: 0.8, fontFamily: "monospace", textTransform: "uppercase", marginBottom: 4 }}>Directions</div>
+                <F k="directions" value={c.directions} />
               </div>
+            </SysSection>
+          </div>
+        </div>
+
+        {/* RIGHT — Original Hard Copy (paper look) */}
+        <div style={{ flex: "1 1 220px", minWidth: 0, borderRadius: 10, overflow: "hidden", border: "1.5px solid #5A4A1A" }}>
+          <div style={{ background: "#2A2010", padding: "7px 12px", fontFamily: "'Spline Sans Mono', monospace", fontSize: 10, fontWeight: 700, color: "#D4C080", letterSpacing: 0.8, display: "flex", justifyContent: "space-between" }}>
+            <span>▸ ORIGINAL HARD COPY</span>
+            <span style={{ opacity: 0.5 }}>READ ONLY</span>
+          </div>
+          <div style={{ background: "#FFFEF5", padding: 0 }}>
+            <div style={{ padding: "12px 16px 10px", textAlign: "center", borderBottom: "2px solid #2a2a33", background: "#FDFBEA" }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#2a2a33" }}>{c.prescriber}</div>
+              <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>{c.prescriberAddr}</div>
             </div>
-            <div style={{ marginTop: 14, fontSize: 12.5, color: "#444" }}>
-              <div>{c.orig.dawChecked ? "☑" : "☐"} Dispense As Written</div>
-              <div>{c.orig.dawChecked ? "☐" : "☑"} Generic Substitution Permissible</div>
-            </div>
-            <div style={{ marginTop: 12, borderTop: "1px solid #ccc", paddingTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontSize: 10.5, color: "#888" }}>Signature</span>
-              <span style={{ ...hand, fontSize: 20 }}>{c.prescriber.replace(", MD", "")}</span>
+            <div style={{ padding: "12px 16px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 9.5, color: "#888", fontFamily: "monospace", textTransform: "uppercase" }}>Patient</div>
+                  <div style={hand}>{c.orig.patient}</div>
+                  <div style={{ ...hand, fontSize: 15 }}>{c.orig.dob}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 9.5, color: "#888", fontFamily: "monospace", textTransform: "uppercase" }}>Date</div>
+                  <div style={hand}>{c.orig.date}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ fontFamily: "'Fraunces',serif", fontSize: 32, fontWeight: 900, color: "#2a2a33", lineHeight: 0.9 }}>℞</div>
+                <div style={{ flex: 1, paddingTop: 4 }}>
+                  <div style={{ ...hand, fontSize: 21, marginBottom: 8 }}>{c.orig.drug} {c.orig.strength}</div>
+                  <div style={{ marginBottom: 4 }}><span style={{ fontSize: 11.5, color: "#666", fontWeight: 600 }}>Disp: </span><span style={hand}>{c.orig.disp}</span></div>
+                  <div style={{ marginBottom: 4 }}><span style={{ fontSize: 11.5, color: "#666", fontWeight: 600 }}>Sig: </span><span style={hand}>{c.orig.sig}</span></div>
+                  <div><span style={{ fontSize: 11.5, color: "#666", fontWeight: 600 }}>Refills: </span><span style={hand}>{c.orig.refills}</span></div>
+                </div>
+              </div>
+              <div style={{ marginTop: 12, fontSize: 12, color: "#444" }}>
+                <div style={{ marginBottom: 2 }}>{c.orig.dawChecked ? "☑" : "☐"} Dispense As Written</div>
+                <div>{c.orig.dawChecked ? "☐" : "☑"} Generic Substitution Permissible</div>
+              </div>
+              <div style={{ marginTop: 10, borderTop: "1px solid #CCC", paddingTop: 6, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 10, color: "#888", fontFamily: "monospace" }}>MD SIGNATURE</span>
+                <span style={{ ...hand, fontSize: 19 }}>{c.prescriber.replace(", MD", "")}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* verify button */}
+      {/* Approve button */}
       {!locked && !overrideRequired && (
         <button onClick={() => choose("__verify__")}
-          style={btn(C.green, "#fff", { width: "100%", marginTop: 14, background: C.green })}>
-          ✓ Everything matches — Verify &amp; fill
+          style={btn(C.green, "#fff", { width: "100%", marginTop: 12 })}>
+          ✓ APPROVE — Entry matches hard copy
         </button>
       )}
 
       {!locked && overrideRequired && (
         <>
-          <button disabled
-            style={btn(C.paper2, C.muted, { width: "100%", marginTop: 14, border: `1px solid ${C.line}`, cursor: "not-allowed" })}>
-            Standard approve disabled - DUR intervention required
+          <button disabled style={btn(C.paper2, C.muted, { width: "100%", marginTop: 12, border: `1px solid ${C.line}`, cursor: "not-allowed" })}>
+            APPROVE disabled — DUR intervention required
           </button>
           <button onClick={() => { setOverrideOpen(true); setOverrideCode(""); setOverrideError(""); }}
-            style={btn(C.clay, "#fff", { width: "100%", marginTop: 10, background: C.clay })}>
-            Manager Override
+            style={btn(C.clay, "#fff", { width: "100%", marginTop: 8 })}>
+            ⚠ Pharmacist DUR Override
           </button>
         </>
       )}
