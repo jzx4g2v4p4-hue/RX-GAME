@@ -3070,45 +3070,59 @@ function TheShift({ level, onHome, best, setBest, onShiftEnd, narratorMode, spee
 
       {/* ── COUNTER WINDOW ── */}
       {active ? (
-        <div key={active.id} style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${feedback ? (feedback.correct ? "#3FB950" : C.clay) : "rgba(31,74,63,0.16)"}`, transition: "border-color .2s" }}>
-          {/* Terminal header */}
-          <div style={{ background: "#0B1F3A", padding: "9px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div key={active.id} style={{ borderRadius: 10, overflow: "hidden", border: `2px solid ${feedback ? (feedback.correct ? "#3FB950" : C.clay) : "#D0D8E0"}`, background: "#FFFFFF", transition: "border-color .2s" }}>
+          {/* Ticket header */}
+          <div style={{ background: "#0B1F3A", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <PixelSprite grid={active.look.grid} colors={active.look.colors} px={2.5} />
-              <span style={{ ...TF, color: "#E8F4F8", fontSize: 12, fontWeight: 600 }}>{active.name}</span>
+              <div style={{ ...TF, color: "#4A8FA5", fontSize: 9 }}>
+                TICKET #{String(active.id).padStart(4,"0")} · COUNTER
+              </div>
+              <div style={{ ...TF, color: "#E8F4F8", fontSize: 11, fontWeight: 600 }}>
+                {active.name.toUpperCase()}
+              </div>
             </div>
-            <span style={{ ...TF, fontSize: 8, letterSpacing: 1.5, color: tagColor(active.task.tag), background: `${tagColor(active.task.tag)}22`, border: `1px solid ${tagColor(active.task.tag)}66`, borderRadius: 5, padding: "3px 7px" }}>{active.task.tag}</span>
+            <span style={{ ...TF, fontSize: 8, letterSpacing: 1, color: tagColor(active.task.tag), background: `${tagColor(active.task.tag)}25`, border: `1px solid ${tagColor(active.task.tag)}55`, borderRadius: 4, padding: "2px 7px" }}>
+              {active.task.tag}
+            </span>
           </div>
-          {/* Question body */}
-          <div style={{ background: feedback ? (feedback.correct ? "rgba(46,139,87,0.06)" : "rgba(178,58,36,0.05)") : C.card, padding: "16px 16px 14px", transition: "background .2s" }}>
-            <h3 style={{ fontSize: 15.5, fontWeight: 700, margin: "0 0 12px", lineHeight: 1.4, color: C.ink }}>{active.task.q}</h3>
-            <div style={{ display: "grid", gap: 7 }}>
+          {/* Scenario body */}
+          <div style={{ padding: "14px 16px 12px", background: feedback ? (feedback.correct ? "rgba(46,139,87,0.04)" : "rgba(178,58,36,0.04)") : "#FAFBFC", borderBottom: "1px solid #E8EDF1" }}>
+            <div style={{ ...TF, color: "#5A7080", fontSize: 8, letterSpacing: 1.5, marginBottom: 6 }}>SITUATION</div>
+            <p style={{ margin: 0, fontSize: 14.5, fontWeight: 600, lineHeight: 1.45, color: "#1A2A35" }}>{active.task.q}</p>
+          </div>
+          {/* Action choices */}
+          <div style={{ padding: "12px 14px 14px", background: "#F7F9FB" }}>
+            <div style={{ ...TF, color: "#5A7080", fontSize: 8, letterSpacing: 1.5, marginBottom: 8 }}>SELECT ACTION</div>
+            <div style={{ display: "grid", gap: 6 }}>
               {active.task.options.map((opt, i) => {
-                let bg = C.paper, border = C.line, color = C.ink;
+                let bg = "#FFFFFF", border = "#D0D8E0", color = "#1A2A35";
                 if (feedback) {
-                  if (i === feedback.answer) { bg = "rgba(46,139,87,0.16)"; border = C.green; }
-                  else if (i === feedback.sel) { bg = "rgba(178,58,36,0.12)"; border = C.clay; }
+                  if (i === feedback.answer) { bg = "rgba(46,139,87,0.10)"; border = "#3FB950"; color = "#1A3020"; }
+                  else if (i === feedback.sel) { bg = "rgba(178,58,36,0.10)"; border = C.clay; color = "#3A1010"; }
                 }
                 return (
                   <button key={i} className="opt" disabled={!!feedback} onClick={() => answer(i)}
-                    style={{ textAlign: "left", background: bg, border: `1.5px solid ${border}`, color, borderRadius: 10,
-                      padding: "10px 13px", cursor: feedback ? "default" : "pointer", fontSize: 14, lineHeight: 1.4 }}>
-                    {opt}
+                    style={{ textAlign: "left", background: bg, border: `1.5px solid ${border}`, color, borderRadius: 8,
+                      padding: "9px 12px", cursor: feedback ? "default" : "pointer", fontSize: 13.5, lineHeight: 1.4,
+                      display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span style={{ ...TF, fontSize: 9, color: feedback ? (i === feedback.answer ? "#3FB950" : i === feedback.sel ? C.clay : "#8A9AAA") : "#8A9AAA", flexShrink: 0, marginTop: 1 }}>[{String.fromCharCode(65+i)}]</span>
+                    <span>{opt}</span>
                   </button>
                 );
               })}
             </div>
             {feedback && (
-              <div className="pop" style={{ marginTop: 11, fontSize: 13, lineHeight: 1.5, color: feedback.correct ? C.green : C.ink, padding: "9px 12px", borderRadius: 8, background: feedback.correct ? "rgba(46,139,87,0.08)" : "rgba(178,58,36,0.07)", border: `1px solid ${feedback.correct ? C.green : C.clay}33` }}>
-                <strong style={{ color: feedback.correct ? C.green : C.clay }}>{feedback.correct ? "✓ " : "✕ "}</strong>{active.task.explain}
+              <div className="pop" style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.55, padding: "9px 12px", borderRadius: 7, background: feedback.correct ? "rgba(46,139,87,0.08)" : "rgba(178,58,36,0.07)", border: `1px solid ${feedback.correct ? "#3FB950" : C.clay}44` }}>
+                <span style={{ ...TF, fontWeight: 700, color: feedback.correct ? "#3FB950" : C.clay, fontSize: 9, letterSpacing: 1, marginRight: 8 }}>{feedback.correct ? "CORRECT" : "INCORRECT"}</span>
+                <span style={{ color: "#2A3A40" }}>{active.task.explain}</span>
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
+        <div style={{ background: "#0B1F3A", borderRadius: 10, padding: "22px 20px", textAlign: "center" }}>
           <div style={{ ...TF, color: "#3FB950", fontSize: 9, letterSpacing: 2, marginBottom: 6 }}>● COUNTER CLEAR</div>
-          <div style={{ ...TF, color: "#4A8FA5", fontSize: 11 }}>Next patient walking up…</div>
+          <div style={{ ...TF, color: "#4A8FA5", fontSize: 11 }}>Queue processing — next task incoming…</div>
         </div>
       )}
 
@@ -5449,16 +5463,65 @@ function CareerMode({ level, onQuit }) {
 }
 
 function SplashScreen({ leaving }) {
+  const [barW, setBarW] = useState(0);
+  const [phase, setPhase] = useState(0); // 0=init, 1=loading, 2=ready
+  const storeNum = useRef(Math.floor(Math.random() * 8000 + 1000)).current;
+  const lines = [
+    "Initializing RXPRO v4.2.1...",
+    "Loading drug database (65,412 entries)...",
+    "Connecting to PBM gateway...",
+    "Loading store #" + storeNum + " configuration...",
+    "Authentication successful. Welcome.",
+  ];
+  const [lineIdx, setLineIdx] = useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 200);
+    const t2 = setTimeout(() => setPhase(2), 1100);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  useEffect(() => {
+    if (phase !== 1) return;
+    let w = 0;
+    const iv = setInterval(() => {
+      w += Math.random() * 14 + 6;
+      if (w >= 100) { w = 100; clearInterval(iv); }
+      setBarW(w);
+    }, 80);
+    return () => clearInterval(iv);
+  }, [phase]);
+  useEffect(() => {
+    if (phase !== 1) return;
+    const iv = setInterval(() => setLineIdx((i) => Math.min(i + 1, lines.length - 1)), 200);
+    return () => clearInterval(iv);
+  }, [phase]); // eslint-disable-line
   return (
     <div className={leaving ? 'splash-leave' : ''} style={{
-      position: 'fixed', inset: 0, background: C.pine,
-      display: 'grid', placeItems: 'center', zIndex: 999,
-      fontFamily: "'Fraunces', serif",
+      position: 'fixed', inset: 0, background: '#071523',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      zIndex: 999, fontFamily: "'Spline Sans Mono', monospace",
     }}>
-      <div style={{ textAlign: 'center', padding: '0 24px' }}>
-        <div className="splash-logo" style={{ fontSize: 96, color: C.paper, lineHeight: 1, fontWeight: 900 }}>℞</div>
-        <div className="pixel splash-sub" style={{ fontSize: 12, color: C.amberSoft, marginTop: 16, letterSpacing: 3 }}>RxReady</div>
-        <div className="pixel splash-sub blink" style={{ fontSize: 7, color: 'rgba(242,233,214,0.5)', marginTop: 14, letterSpacing: 2 }}>PHARMACY ARCADE</div>
+      <div style={{ width: 'min(420px, 92vw)', textAlign: 'left' }}>
+        {/* Logo bar */}
+        <div style={{ borderBottom: '1px solid rgba(126,184,201,0.2)', paddingBottom: 18, marginBottom: 18 }}>
+          <div style={{ color: '#7EB8C9', fontSize: 9, letterSpacing: 3, marginBottom: 8 }}>RXPRO PHARMACY MANAGEMENT SYSTEM</div>
+          <div style={{ color: '#E8F4F8', fontSize: 28, fontWeight: 700, letterSpacing: 2, lineHeight: 1 }}>STORE #{storeNum}</div>
+          <div style={{ color: '#4A8FA5', fontSize: 10, marginTop: 5, letterSpacing: 1 }}>RETAIL PHARMACY WORKSTATION</div>
+        </div>
+        {/* Boot log */}
+        <div style={{ marginBottom: 18, minHeight: 100 }}>
+          {lines.slice(0, lineIdx + 1).map((l, i) => (
+            <div key={i} style={{ color: i === lineIdx ? '#E8F4F8' : '#3A6070', fontSize: 10, lineHeight: 1.8, letterSpacing: 0.5 }}>
+              {i < lineIdx ? '✓ ' : '  '}{l}
+            </div>
+          ))}
+        </div>
+        {/* Progress bar */}
+        <div style={{ height: 3, background: 'rgba(126,184,201,0.15)', borderRadius: 2, overflow: 'hidden', marginBottom: 12 }}>
+          <div style={{ height: '100%', width: `${barW}%`, background: '#3FB950', transition: 'width .08s linear' }} />
+        </div>
+        <div style={{ color: '#3A6070', fontSize: 9, letterSpacing: 1 }}>
+          {barW < 100 ? `LOADING... ${Math.round(barW)}%` : '● READY'}
+        </div>
       </div>
     </div>
   );
@@ -5507,19 +5570,16 @@ export default function App() {
 
   return (
     <div style={{
-      minHeight: "100vh", background: C.paper, color: C.ink,
+      minHeight: "100vh", background: "#E8EDF1", color: C.ink,
       fontFamily: "'Spline Sans', sans-serif",
-      backgroundImage:
-        `radial-gradient(circle at 12% 18%, rgba(192,120,30,0.08), transparent 38%),
-         radial-gradient(circle at 88% 82%, rgba(31,74,63,0.10), transparent 42%)`,
     }}>
       <style>{FONTS}{`
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
         input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
         html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         button, [role="button"] { touch-action: manipulation; }
-        .rx-card { background:${C.card}; border:1px solid ${C.line};
-          border-radius:20px; box-shadow: 0 10px 30px -18px rgba(31,74,63,0.45); }
+        .rx-card { background:#FFFFFF; border:1px solid #D0D8E0;
+          border-radius:12px; box-shadow: 0 2px 10px rgba(0,20,40,0.07); }
         .display { font-family:'Fraunces', serif; }
         .mono { font-family:'Spline Sans Mono', monospace; }
         .rise { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
@@ -5673,29 +5733,24 @@ export default function App() {
 function Header({ onHome, show, save }) {
   const rank = save ? getRank(save.lifetimeEarned) : null;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={onHome}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, background: C.pine,
-          color: C.paper, display: "grid", placeItems: "center",
-          fontFamily: "'Fraunces',serif", fontSize: 24, fontWeight: 900,
-          boxShadow: "0 8px 18px -10px rgba(31,74,63,0.8)",
-        }}>℞</div>
+    <div style={{ background: "#0B1F3A", borderRadius: 10, marginBottom: 14, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={onHome}>
+        <div style={{ width: 32, height: 32, borderRadius: 7, background: "#143520", border: "1px solid rgba(63,185,80,0.3)", color: "#3FB950", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 16, fontWeight: 900 }}>℞</div>
         <div>
-          <div className="pixel" style={{ fontSize: 14, color: C.pine, lineHeight: 1 }}>RxReady</div>
-          <div className="pixel" style={{ fontSize: 7, color: C.amber, marginTop: 5 }}>PHARMACY ARCADE</div>
+          <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 12, fontWeight: 600, color: "#E8F4F8", lineHeight: 1 }}>RXPRO</div>
+          <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 7, color: "#4A8FA5", marginTop: 3, letterSpacing: 1 }}>PHARMACY SIM</div>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {save && (
           <div style={{ textAlign: "right" }}>
-            <div className="display" style={{ fontSize: 16, fontWeight: 900, color: C.green, lineHeight: 1 }}>${save.currency}</div>
-            <div className="mono" style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.muted }}>{rank}</div>
+            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 13, fontWeight: 700, color: "#3FB950", lineHeight: 1 }}>${save.currency}</div>
+            <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 7, color: "#4A8FA5", marginTop: 3, letterSpacing: 0.5 }}>{rank}</div>
           </div>
         )}
         {show && (
-          <button onClick={onHome} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 16px", fontSize: 14 })}>
-            ← Home
+          <button onClick={onHome} style={{ fontFamily: "'Spline Sans Mono',monospace", background: "rgba(126,184,201,0.1)", border: "1px solid rgba(126,184,201,0.25)", color: "#7EB8C9", borderRadius: 7, padding: "7px 13px", cursor: "pointer", fontSize: 10 }}>
+            ← HOME
           </button>
         )}
       </div>
