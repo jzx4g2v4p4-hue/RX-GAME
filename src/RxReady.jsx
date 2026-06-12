@@ -50,100 +50,100 @@ const LEVELS = [
 const MODES = [
   {
     id: 1,
-    title: "Rapid Refill",
-    tag: "Speed Round",
-    desc: "Beat the clock. Multiple-choice across every skill area with a combo multiplier and three lives.",
+    title: "Speed Drill",
+    tag: "Rapid Fire",
+    desc: "Beat the clock. Multiple-choice across every skill area — sig codes, interactions, counseling, law — with a combo multiplier and three lives.",
     icon: "⏱",
   },
   {
     id: 2,
-    title: "Fill the Rx",
-    tag: "Simulation",
-    desc: "Work real prescriptions step by step — decode the sig, run the math, catch the problem, counsel the patient.",
+    title: "Count & Fill",
+    tag: "Tech Bench",
+    desc: "You're the tech at the fill bench. Read the label, pull the right stock bottle, count to the correct quantity, and make sure the label matches the script before sending to QV2.",
     icon: "℞",
   },
   {
     id: 3,
-    title: "At the Counter",
-    tag: "Role-Play",
-    desc: "Live patient scenarios with branching choices. Balance safety, the law, and good service.",
+    title: "Pickup Counter",
+    tag: "Patient Window",
+    desc: "Patients are at the counter or the drive-thru window. Handle pickups, new-therapy counseling, OTC questions, and the hard situations — the hostile patient, the allergic reaction, the controlled-substance red flag.",
     icon: "☺",
   },
   {
     id: 4,
-    title: "Drug Mastery",
-    tag: "Top Drugs",
-    desc: "Brand ↔ generic, drug class, indication, counseling, and controlled-substance schedules — drawn from a database of the most commonly dispensed medications.",
+    title: "Product Knowledge",
+    tag: "Drug Cards",
+    desc: "Brand ↔ generic, drug class, indication, counseling points, and controlled-substance schedules — the same drugs that fill your will-call bags every day.",
     icon: "✚",
   },
   {
     id: 5,
-    title: "Rx Verification",
-    tag: "DUR Bench",
-    desc: "The real workflow: read the script against the patient's allergies, meds, and conditions, catch the safety alert, then make the call — verify, clarify, or reject.",
+    title: "DUR Screen",
+    tag: "Clinical Review",
+    desc: "A script hits your queue with a DUR alert. Check it against the patient's profile — allergies, current meds, conditions — catch the real problem, and make the call: verify, call the prescriber, or reject.",
     icon: "⊕",
   },
   {
     id: 6,
-    title: "Script Lab",
-    tag: "Sig Builder",
-    desc: "Turn the prescriber's intent into a clean, unambiguous patient label — build the sig piece by piece and learn what belongs on the directions.",
+    title: "Build the Label",
+    tag: "Sig → Label",
+    desc: "The prescriber wrote shorthand. You build the patient-facing directions — translate the sig, set the correct route and frequency, and produce a clean, unambiguous label.",
     icon: "✎",
   },
   {
     id: 7,
-    title: "Insurance Desk",
-    tag: "Claim Rejections",
-    desc: "Work real third-party rejections by NCPDP code — refill too soon, prior auth, non-formulary, quantity limits, DUR, eligibility — and choose the right fix.",
+    title: "Reject Codes",
+    tag: "Third-Party Billing",
+    desc: "The claim came back rejected. Read the NCPDP code — refill-too-soon, prior auth required, non-formulary, quantity limit, eligibility — and run the right fix before the patient loses it.",
     icon: "▤",
   },
   {
     id: 8,
-    title: "Virginia Law",
-    tag: "VA Board of Pharmacy",
-    desc: "Virginia-specific rules: Schedule VI, controlled-substance refill and expiration limits, emergency dispensing, and the pharmacist statewide protocols you can act under.",
+    title: "VA Board Rules",
+    tag: "Virginia Law",
+    desc: "Virginia-specific board rules: Schedule VI, CII/CIII refill and expiration limits, emergency dispensing, collaborative practice, and what you can and can't do under the statewide protocols.",
     icon: "§",
   },
   {
     id: 9,
-    title: "The Shift",
-    tag: "Live Sim",
-    desc: "Work the counter against the clock. Patients line up with real tasks — keep the line moving, earn tips, and don't let your reputation tank.",
+    title: "Floor Shift",
+    tag: "Full CVS Sim",
+    desc: "You're on the floor. The counter queue climbs, drive-thru cars stack up, phones ring, and waiters hover. Keep everything moving — this is what a real shift feels like.",
     icon: "▶",
   },
   {
     id: 10,
-    title: "Verify Bench",
-    tag: "Data Verification",
-    desc: "The real verification screen: compare the typed entry against the original hard copy and tap whatever doesn't match — wrong strength, miskeyed sig, bad quantity, DAW mismatch.",
+    title: "QV1 — Check Entry",
+    tag: "Pharmacist Verification",
+    desc: "A script is waiting in QV1. Compare the system entry to the original hard copy — catch wrong strength, bad quantity, miskeyed sig, DAW violation. This is your legal sign-off.",
     icon: "✓",
   },
   {
     id: 11,
-    title: "Data Entry",
-    tag: "Key it in",
-    desc: "Be the one entering the script. Read the doctor's hard copy and type it into the system — translate the sig (with live expansion), enter quantity, work out the days supply, set refills and DAW.",
+    title: "Type the Script",
+    tag: "QT Queue",
+    desc: "Scripts are piling up in QT. Read each hard copy and enter it — translate the sig (live expansion shows you the patient label as you type), calculate days supply, set refills, flag DAW.",
     icon: "⌨",
   },
   {
     id: 12,
-    title: "Fill Check",
-    tag: "Check the tech",
-    desc: "Final product verification: the tech filled it — confirm they pulled the right stock, counted right, the pills in the vial match the reference, and the label's correct. Approve or reject.",
+    title: "QV2 — Final Check",
+    tag: "Product Verification",
+    desc: "The tech filled it — your job is to verify before it goes to will-call. Does the stock match the drug and strength? Right count? Pills look correct? Label matches the script? Approve or reject.",
     icon: "⊙",
   },
   {
     id: 13,
-    title: "ManagerShift",
+    title: "Run the Queue",
     tag: "Queue Control",
-    desc: "Run the bench from a dashboard: verify data, watch production timers, handle drive-thru escalations, and finish with a CII safe audit.",
+    desc: "You're the shift lead. Watch QT, QV1, QP, and QV2 lanes from the dashboard — triage production timers, handle drive-thru escalations, and end with the CII safe count.",
     icon: "M",
   },
   {
     id: 14,
     title: "Career Mode",
-    tag: "Real Consequences",
-    desc: "Run full manager shifts across multiple days. Earn bonuses, eat penalties, chase promotions, and stay solvent.",
+    tag: "CVS Pharmacist",
+    desc: "Work multi-day CVS shifts. Build your stats, chase promotion from Intern to Pharmacist-in-Charge, bank bonuses, and don't let the metrics tank.",
     icon: "$",
   },
 ];
@@ -163,34 +163,34 @@ const MODE_GROUPS = [
   {
     id: "career",
     title: "Full Shift",
-    tag: "POV Simulator",
+    tag: "CVS Floor Sim",
     lead: 14,
     modes: [14, 13, 9],
-    desc: "CVS-style chain shift: queues, phones, pickup, drive-thru, waiters, metrics, final checks, and safe audit.",
+    desc: "Clock in and run a full CVS shift — queues, phones, pickup, drive-thru, waiters, metrics, safe audit.",
   },
   {
     id: "verification",
-    title: "Verification Bench",
-    tag: "Pharmacist Work",
+    title: "Pharmacist Station",
+    tag: "QV1 · DUR · QV2",
     lead: 10,
     modes: [11, 10, 5, 12],
-    desc: "Focused practice for QT/QV1/QV2: data entry, data verification, DUR review, and final product inspection.",
+    desc: "Your chair at the bench: type incoming scripts (QT), check entries (QV1), screen for DURs, and clear QV2 before will-call.",
   },
   {
     id: "workflow",
-    title: "Workflow Training",
-    tag: "Stations",
+    title: "Tech Bench",
+    tag: "Fill · Label · Billing",
     lead: 2,
     modes: [2, 6, 7, 8],
-    desc: "Prescription entry practice, sig building, insurance rejections, and law cases.",
+    desc: "Tech-side work: count and fill prescriptions, build patient-facing labels, resolve insurance rejects, and know the law.",
   },
   {
     id: "knowledge",
-    title: "Knowledge Drills",
-    tag: "Practice",
+    title: "Patient Window",
+    tag: "Counter · Counseling",
     lead: 1,
     modes: [1, 4, 3],
-    desc: "Fast recall, drug mastery, OTC judgment, counseling, and counter conversations.",
+    desc: "The counter is busy. Speed drills keep your reflexes sharp; product knowledge and counseling scenarios cover what patients actually ask.",
   },
 ];
 
@@ -6024,6 +6024,8 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
   const TM = { fontFamily: "'Spline Sans Mono',monospace" };
   const timeStr = liveClock.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
   const dayStr = liveClock.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+  const hour = liveClock.getHours();
+  const greeting = hour < 12 ? "GOOD MORNING" : hour < 17 ? "GOOD AFTERNOON" : "GOOD EVENING";
   const qColor = (n, lo, hi) => n >= hi ? "#FF4444" : n >= lo ? "#FFB800" : "#3FB950";
 
   const recommended = getRecommended(save);
@@ -6046,62 +6048,64 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
   };
   return (
     <div className="rise">
-      {/* ── RXPRO HEADER ── */}
-      <div style={{ borderRadius: "14px 14px 0 0", background: "#0B1F3A", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+      {/* ── CVS HEADER ── */}
+      <div style={{ borderRadius: "14px 14px 0 0", background: "#CC0000", padding: "10px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <div>
-          <div style={{ ...TM, color: "#7EB8C9", fontSize: 8, letterSpacing: 2.5, marginBottom: 3 }}>RXPRO v4.2 · STORE #{termData.storeNum}</div>
-          <div style={{ ...TM, color: "#E8F4F8", fontSize: 12, fontWeight: 600 }}>RPh: {termData.rph}</div>
+          <div style={{ ...TM, color: "rgba(255,255,255,0.65)", fontSize: 8, letterSpacing: 2.5, marginBottom: 3 }}>CVS PHARMACY · STORE #{termData.storeNum}</div>
+          <div style={{ ...TM, color: "#FFFFFF", fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>{greeting}, {termData.rph.split(",")[0]}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ ...TM, color: "#E8F4F8", fontSize: 13, fontWeight: 600, letterSpacing: 1 }}>{timeStr}</div>
-          <div style={{ ...TM, color: "#4A8FA5", fontSize: 9, letterSpacing: 1, marginTop: 1 }}>{dayStr}</div>
-          {streak > 0 && <div style={{ ...TM, color: "#FFB800", fontSize: 9, marginTop: 3 }}>🔥 {streak}-day streak</div>}
+          <div style={{ ...TM, color: "#FFFFFF", fontSize: 13, fontWeight: 600, letterSpacing: 1 }}>{timeStr}</div>
+          <div style={{ ...TM, color: "rgba(255,255,255,0.6)", fontSize: 9, letterSpacing: 1, marginTop: 1 }}>{dayStr}</div>
+          {streak > 0 && <div style={{ ...TM, color: "#FFE57A", fontSize: 9, marginTop: 3 }}>🔥 {streak}-day streak</div>}
         </div>
       </div>
 
-      {/* ── FLOOR STATUS ── */}
-      <div style={{ background: "#0F2A3F", padding: "10px 18px 12px", marginBottom: 14, borderTop: "1px solid rgba(126,184,201,0.1)", borderRadius: "0 0 14px 14px" }}>
+      {/* ── RXCONNECT QUEUE STATUS ── */}
+      <div style={{ background: "#0F2A3F", padding: "8px 18px 12px", marginBottom: 14, borderTop: "1px solid rgba(204,0,0,0.3)", borderRadius: "0 0 14px 14px" }}>
+        <div style={{ ...TM, color: "rgba(126,184,201,0.5)", fontSize: 7, letterSpacing: 2, marginBottom: 7 }}>RXCONNECT · QUEUE STATUS</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr) 1.4fr", gap: 6 }}>
           {[
-            { k: "QT",  v: termData.qt,  lo: 8,  hi: 14 },
-            { k: "QV1", v: termData.qv1, lo: 4,  hi: 7  },
-            { k: "QP",  v: termData.qp,  lo: 3,  hi: 5  },
-            { k: "QV2", v: termData.qv2, lo: 3,  hi: 5  },
-          ].map(({ k, v, lo, hi }) => {
+            { k: "QT",  label: "To Type",    v: termData.qt,  lo: 8,  hi: 14 },
+            { k: "QV1", label: "To Verify",  v: termData.qv1, lo: 4,  hi: 7  },
+            { k: "QP",  label: "Filling",    v: termData.qp,  lo: 3,  hi: 5  },
+            { k: "QV2", label: "Final Chk",  v: termData.qv2, lo: 3,  hi: 5  },
+          ].map(({ k, label, v, lo, hi }) => {
             const col = qColor(v, lo, hi);
             return (
               <div key={k} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "7px 4px 5px", textAlign: "center" }}>
                 <div style={{ ...TM, color: col, fontSize: 19, fontWeight: 700, lineHeight: 1 }}>{v}</div>
                 <div style={{ ...TM, color: col, fontSize: 8, letterSpacing: 1, marginTop: 1 }}>{k}</div>
+                <div style={{ ...TM, color: "rgba(126,184,201,0.4)", fontSize: 6.5, marginTop: 2 }}>{label}</div>
               </div>
             );
           })}
-          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "5px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "5px 8px", display: "flex", flexDirection: "column", justifyContent: "space-around" }}>
             {[
-              { label: "DT", val: `${termData.drivethru}`, urgent: termData.drivethru >= 3 },
-              { label: "WC", val: `${termData.willcall}`, urgent: termData.willcall >= 22 },
-              { label: "PH", val: termData.phones ? "RING" : "OK", urgent: termData.phones, blink: termData.phones },
+              { label: "Drive-Thru", val: `${termData.drivethru} cars`, urgent: termData.drivethru >= 3 },
+              { label: "Will-Call",  val: `${termData.willcall} bags`, urgent: termData.willcall >= 22 },
+              { label: "Phones",     val: termData.phones ? "HOLDING" : "CLEAR", urgent: termData.phones, blink: termData.phones },
             ].map(({ label, val, urgent, blink }) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ ...TM, color: "#3A6070", fontSize: 7 }}>{label}</span>
-                <span className={blink ? "blink" : ""} style={{ ...TM, color: urgent ? "#FF4444" : "#3FB950", fontSize: 9, fontWeight: 600 }}>{val}</span>
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ ...TM, color: "#3A6070", fontSize: 6.5 }}>{label}</span>
+                <span className={blink ? "blink" : ""} style={{ ...TM, color: urgent ? "#FF4444" : "#3FB950", fontSize: 8.5, fontWeight: 600 }}>{val}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* ── RANK CARD ── */}
+      {/* ── BADGE CARD ── */}
       {save && save.shifts > 0 && (
-        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(63,185,80,0.2)" }}>
-          <div style={{ width: 36, height: 36, borderRadius: 9, background: "#143520", border: "1px solid rgba(63,185,80,0.3)", color: "#3FB950", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, flexShrink: 0 }}>℞</div>
+        <div style={{ background: "#0B1F3A", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(204,0,0,0.25)" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, background: "#220000", border: "1px solid rgba(204,0,0,0.4)", color: "#CC0000", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, flexShrink: 0 }}>℞</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ ...TM, fontWeight: 600, fontSize: 11, color: "#E8F4F8" }}>{getRank(save.lifetimeEarned)}</div>
-            <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", marginTop: 2 }}>{save.shifts} shifts · ${save.lifetimeEarned} earned</div>
+            <div style={{ ...TM, fontWeight: 700, fontSize: 11, color: "#E8F4F8" }}>{getRank(save.lifetimeEarned)}</div>
+            <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", marginTop: 2 }}>CVS Store #{termData.storeNum} · {save.shifts} shifts completed</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ ...TM, fontSize: 18, fontWeight: 700, color: "#3FB950", lineHeight: 1 }}>${save.currency}</div>
-            <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginTop: 2 }}>BALANCE</div>
+            <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginTop: 2 }}>EARNED</div>
           </div>
         </div>
       )}
@@ -6109,7 +6113,7 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
       {/* ── TODAY'S TRAINING ── */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <span style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5 }}>▸ TODAY'S TRAINING</span>
+          <span style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5 }}>▸ TODAY'S FOCUS</span>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             {[0,1,2].map((i) => (
               <div key={i} style={{ width: 8, height: 8, borderRadius: 2, background: i < doneToday ? "#3FB950" : "rgba(255,255,255,0.12)" }} />
@@ -6149,33 +6153,36 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
 
       {/* ── CLOCK IN HERO ── */}
       <button onClick={() => onPick(14)} className="lift"
-        style={{ width: "100%", textAlign: "left", cursor: "pointer", border: "2px solid #3FB950", borderRadius: 12, padding: 0, marginBottom: 18, color: "#E8F4F8", overflow: "hidden", background: "#0B1F3A", boxShadow: "0 4px 24px -8px rgba(63,185,80,0.35)" }}>
-        <div style={{ background: "#143520", padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(63,185,80,0.2)" }}>
-          <span style={{ ...TM, color: "#3FB950", fontSize: 8, letterSpacing: 2 }}>CAREER MODE · FULL SHIFT</span>
-          <span className="blink" style={{ ...TM, color: "#3FB950", fontSize: 8, letterSpacing: 2 }}>● READY</span>
+        style={{ width: "100%", textAlign: "left", cursor: "pointer", border: "none", borderRadius: 12, padding: 0, marginBottom: 18, color: "#FFFFFF", overflow: "hidden", background: "#CC0000", boxShadow: "0 4px 20px -6px rgba(204,0,0,0.5)" }}>
+        <div style={{ background: "rgba(0,0,0,0.2)", padding: "7px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <span style={{ ...TM, color: "rgba(255,255,255,0.7)", fontSize: 8, letterSpacing: 2 }}>CAREER MODE · CVS PHARMACIST</span>
+          <span className="blink" style={{ ...TM, color: "#FFE57A", fontSize: 8, letterSpacing: 2 }}>● YOUR SHIFT STARTS NOW</span>
         </div>
         <div style={{ padding: "14px 16px 16px", display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ background: "#3FB950", color: "#0B1F3A", borderRadius: 8, padding: "10px 14px", flexShrink: 0 }}>
+          <div style={{ background: "#FFFFFF", color: "#CC0000", borderRadius: 8, padding: "10px 14px", flexShrink: 0 }}>
             <span style={{ ...TM, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>▶ CLOCK IN</span>
           </div>
           <div>
-            <div style={{ fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, color: "#E8F4F8", lineHeight: 1.1 }}>Run the Full CVS Floor</div>
-            <div style={{ ...TM, fontSize: 9, color: "#7EB8C9", marginTop: 4 }}>QT → QV1 → Fill → QV2 · Drive-thru · Phones · Pickups · ~25 min</div>
+            <div style={{ fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, color: "#FFFFFF", lineHeight: 1.1 }}>Run the Full CVS Floor</div>
+            <div style={{ ...TM, fontSize: 9, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>QT → QV1 → Fill → QV2 · Drive-thru · Phones · Will-call · ~25 min</div>
           </div>
         </div>
       </button>
 
       {/* ── ALL TRAINING STATIONS ── */}
-      <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5, marginBottom: 10 }}>▸ ALL TRAINING STATIONS</div>
+      <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5, marginBottom: 10 }}>▸ ALL STATIONS</div>
 
       {[
-        { label: "VERIFICATION BENCH", ids: [11, 10, 5, 12] },
-        { label: "PRESCRIPTION SKILLS", ids: [4, 6, 2, 3] },
-        { label: "CLINICAL & LAW", ids: [1, 7, 8] },
-        { label: "SHIFT SIM", ids: [9, 13] },
-      ].map(({ label, ids }) => (
+        { label: "PHARMACIST STATION", sub: "QT · QV1 · DUR · QV2", ids: [11, 10, 5, 12] },
+        { label: "TECH BENCH",          sub: "Fill · Label · Billing · Law", ids: [4, 6, 2, 7] },
+        { label: "PATIENT WINDOW",      sub: "Counter · Counseling · Speed", ids: [3, 8, 1] },
+        { label: "FULL SHIFT",          sub: "Floor · Queue · Career", ids: [9, 13] },
+      ].map(({ label, sub, ids }) => (
         <div key={label} style={{ marginBottom: 12 }}>
-          <div style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 2, marginBottom: 6, paddingLeft: 2 }}>{label}</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 6, paddingLeft: 2 }}>
+            <div style={{ ...TM, color: "#7EB8C9", fontSize: 7, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
+            <div style={{ ...TM, color: "#2A4A5A", fontSize: 6.5 }}>{sub}</div>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7 }}>
             {ids.map((id) => <ModeTile key={id} id={id} />)}
           </div>
