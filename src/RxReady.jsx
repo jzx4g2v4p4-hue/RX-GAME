@@ -4434,9 +4434,12 @@ function FillCheck({ level, onFinish, onQuit }) {
   );
 }
 
-function managerRxFromFillCase(c, i) {
+function managerRxFromFillCase(c, i, level = 4) {
   const lanes = ["Drive-thru", "Counter", "Waiter", "Phone"];
-  const patienceMs = 32000 + ((i * 11000) % 26000);
+  // Level-scaled patience: intern gets much more time, expert gets pressure
+  const baseByLevel = [0, 90000, 65000, 45000, 28000][level] ?? 45000;
+  const spread = ((i * 11000) % 26000);
+  const patienceMs = baseByLevel + spread;
   return {
     id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
     patient: c.rx.patient,
@@ -4798,7 +4801,7 @@ function ShiftReport({ report, hourlyRate, onContinue }) {
 
 /* ---------- Mode 13: ManagerShift ---------- */
 function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQuit }) {
-  const [toVerifyData, setToVerifyData] = useState(() => shuffle(FILLCHECK.filter((c) => c.level <= level)).slice(0, 6).map(managerRxFromFillCase));
+  const [toVerifyData, setToVerifyData] = useState(() => shuffle(FILLCHECK.filter((c) => c.level <= level)).slice(0, 6).map((c, i) => managerRxFromFillCase(c, i, level)));
   const [inProduction, setInProduction] = useState([]);
   const [finalCheck, setFinalCheck] = useState([]);
   const [completed, setCompleted] = useState(0);
@@ -5024,32 +5027,33 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     const left = patientLeftMs(rx);
     const pct = Math.max(0, Math.min(100, (left / rx.patienceMs) * 100));
     const hot = pct <= 28;
-    const color = pct <= 20 ? C.clay : pct <= 45 ? C.amber : C.green;
+    const color = pct <= 20 ? "#FF4444" : pct <= 45 ? "#FFB800" : "#3FB950";
     return (
-      <div style={{ marginTop: 9 }}>
-        <div className="mono" style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9.5, color: hot ? C.clay : C.muted }}>
-          <span>{rx.lane}{rx.deEscalated ? " / recovered" : ""}</span>
-          <span>{left > 0 ? `${Math.ceil(left / 1000)}s patience` : "ZERO"}</span>
+      <div style={{ marginTop: 7 }}>
+        <div style={{ fontFamily: "'Spline Sans Mono',monospace", display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9, color: hot ? "#FF4444" : "#8A9AAA" }}>
+          <span>{rx.lane?.toUpperCase()}{rx.deEscalated ? " / RECOVERED" : ""}</span>
+          <span>{left > 0 ? `${Math.ceil(left / 1000)}s` : "EXPIRED"}</span>
         </div>
-        <div style={{ height: 6, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 5 }}>
+        <div style={{ height: 4, background: "#E8EDF1", borderRadius: 2, overflow: "hidden", marginTop: 4 }}>
           <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .25s linear" }} />
         </div>
       </div>
     );
   };
 
-  const Column = ({ title, count, children }) => (
+  const TM = { fontFamily: "'Spline Sans Mono',monospace" };
+  const Column = ({ title, count, color = "#3FB950", children }) => (
     <div style={{ minWidth: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div className="display" style={{ fontSize: 18, fontWeight: 900 }}>{title}</div>
-        <span className="mono" style={{ fontSize: 11, color: C.amber }}>{count}</span>
+      <div style={{ background: "#0B1F3A", borderRadius: "10px 10px 0 0", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>{title}</span>
+        <span style={{ ...TM, color: count > 0 ? color : "#3A6070", fontSize: 13, fontWeight: 700, background: count > 0 ? `${color}22` : "transparent", border: count > 0 ? `1px solid ${color}44` : "none", borderRadius: 4, padding: "1px 6px" }}>{count}</span>
       </div>
-      <div style={{ display: "grid", gap: 10 }}>{children}</div>
+      <div style={{ background: "#F2F5F7", borderRadius: "0 0 10px 10px", padding: 8, display: "grid", gap: 8 }}>{children}</div>
     </div>
   );
 
   const EmptyLane = ({ text }) => (
-    <div style={{ padding: 14, borderRadius: 12, border: `1px dashed ${C.line}`, color: C.muted, fontSize: 13.5, textAlign: "center" }}>{text}</div>
+    <div style={{ padding: 14, borderRadius: 8, border: "1px dashed #C8D4DC", color: "#8A9AAA", fontSize: 12, textAlign: "center", background: "#FAFBFC", ...TM }}>{text}</div>
   );
 
 
@@ -5057,26 +5061,13 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     const count = chainTasks[task.id] || 0;
     const hot = count >= Math.max(4, task.max - 2);
     return (
-      <button
-        onClick={() => handleChainTask(task.id)}
-        style={{
-          border: `1px solid ${hot ? C.clay : C.line}`,
-          background: hot ? "rgba(178,58,36,0.10)" : C.card,
-          color: C.ink,
-          borderRadius: 12,
-          padding: 11,
-          cursor: "pointer",
-          textAlign: "left",
-          minHeight: 78,
-          display: "grid",
-          gap: 5,
-        }}
-      >
-        <span className="mono" style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: hot ? C.clay : C.amber }}>
-          {task.label} x{count}
-        </span>
-        <span style={{ fontWeight: 900, fontSize: 14.5 }}>{task.action}</span>
-        <span style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.35 }}>{task.note}</span>
+      <button onClick={() => handleChainTask(task.id)} style={{ border: `1px solid ${hot ? "#FF444466" : "#D0D8E0"}`, background: hot ? "rgba(255,68,68,0.06)" : "#FFFFFF", color: "#1A2A35", borderRadius: 8, padding: "9px 11px", cursor: "pointer", textAlign: "left", minHeight: 70, display: "grid", gap: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ ...TM, fontSize: 8, letterSpacing: 1.5, color: hot ? "#FF4444" : "#5A7080" }}>{task.label}</span>
+          <span style={{ ...TM, fontSize: 11, fontWeight: 700, color: hot ? "#FF4444" : "#3FB950", background: hot ? "rgba(255,68,68,0.12)" : "rgba(63,185,80,0.1)", border: `1px solid ${hot ? "#FF444444" : "#3FB95044"}`, borderRadius: 4, padding: "1px 5px" }}>×{count}</span>
+        </div>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>{task.action}</span>
+        <span style={{ color: "#6A7A80", fontSize: 11, lineHeight: 1.3 }}>{task.note}</span>
       </button>
     );
   };
@@ -5089,165 +5080,167 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   }, null);
 
   return (
-    <div className="rise">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 16 }}>
-          <Stat label="Cleared" value={completed} color={C.pine} />
-          <Stat label="Accuracy" value={completed ? `${Math.round((correct / completed) * 100)}%` : "-"} color={C.amber} />
-          <Stat label="Bonuses" value={money(shiftBonuses)} color={C.green} />
-          <Stat label="Penalties" value={money(shiftPenalties)} color={shiftPenalties ? C.clay : C.muted} />
+    <div>
+      {/* ── RXPRO SHIFT HEADER ── */}
+      <div style={{ background: "#0B1F3A", borderRadius: "10px 10px 0 0", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2, marginBottom: 3 }}>RXPRO — SHIFT MANAGER VIEW</div>
+          <div style={{ ...TM, color: "#E8F4F8", fontSize: 12, fontWeight: 600 }}>QUEUE STATUS · QT / QV1 / QP / QV2</div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button onClick={wtfButton} style={btn(C.clay, "#fff", { padding: "9px 13px", fontSize: 13, borderRadius: 10, background: C.clay })}>
-            WTF Button
-          </button>
-          <button onClick={() => startSafeAudit()} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, padding: "9px 13px", fontSize: 13 })}>
-            End shift / audit
-          </button>
-        </div>
-      </div>
-      <ProgressBar value={(completed / Math.max(total, 1)) * 100} />
-
-      <div className="rx-card" style={{ padding: 14, margin: "14px 0", borderRadius: 14, background: "#fffaf0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 12 }}>
-          <div>
-            <div className="mono" style={{ fontSize: 10, color: C.amber, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>
-              Retail chain wallboard
-            </div>
-            <div className="display" style={{ fontSize: 24, fontWeight: 900, lineHeight: 1 }}>
-              QT / QV1 / QP / QV2
-            </div>
-            <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.45, marginTop: 5 }}>
-              Clear service fires while protecting final-check accuracy.
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(72px, 1fr))", gap: 8, minWidth: 250 }}>
-            <HeaderStatLite label="Service" value={`${serviceScore}%`} color={serviceColor} />
-            <HeaderStatLite label="XP" value={chainXp} color={C.amber} />
-            <HeaderStatLite label="Streak" value={`x${chainStreak}`} color={chainStreak >= 5 ? C.green : C.pine} />
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginBottom: 11 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           {[
-            ["QT", toVerifyData.length, "intake/data"],
-            ["QV1", toVerifyData.length, "pharmacist data check"],
-            ["QP", inProduction.length, "tech production"],
-            ["QV2", finalCheck.length, "final product check"],
-          ].map(([label, value, sub]) => (
-            <div key={label} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 10px", background: C.paper }}>
-              <div className="display" style={{ fontSize: 21, fontWeight: 900, color: C.pine, lineHeight: 1 }}>{label}</div>
-              <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 4 }}>{value} waiting</div>
-              <div style={{ color: C.muted, fontSize: 11, marginTop: 4, lineHeight: 1.25 }}>{sub}</div>
+            { k: "CLEARED", v: completed, c: "#3FB950" },
+            { k: "ACC", v: completed ? `${Math.round((correct/completed)*100)}%` : "—", c: "#FFB800" },
+            { k: "SVC", v: `${serviceScore}%`, c: serviceColor },
+            { k: "STREAK", v: `×${chainStreak}`, c: chainStreak >= 5 ? "#3FB950" : "#7EB8C9" },
+          ].map(({ k, v, c }) => (
+            <div key={k} style={{ ...TM, textAlign: "center", background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "4px 8px" }}>
+              <div style={{ color: c, fontSize: 13, fontWeight: 700, lineHeight: 1 }}>{v}</div>
+              <div style={{ color: "#3A6070", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
             </div>
           ))}
+          <button onClick={wtfButton} style={{ ...TM, background: "rgba(255,68,68,0.2)", border: "1px solid rgba(255,68,68,0.5)", color: "#FF4444", borderRadius: 7, padding: "6px 11px", cursor: "pointer", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>
+            DE-ESCALATE
+          </button>
+          <button onClick={() => startSafeAudit()} style={{ ...TM, background: "rgba(126,184,201,0.12)", border: "1px solid rgba(126,184,201,0.25)", color: "#7EB8C9", borderRadius: 7, padding: "6px 11px", cursor: "pointer", fontSize: 10 }}>
+            END SHIFT
+          </button>
+        </div>
+      </div>
+
+      {/* ── FLOOR STATUS STRIP ── */}
+      <div style={{ background: "#0F2A3F", padding: "10px 14px", marginBottom: 12, borderTop: "1px solid rgba(126,184,201,0.1)", borderRadius: "0 0 10px 10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr) 2fr", gap: 7 }}>
+          {[
+            { k: "QT",  v: toVerifyData.length, hi: 4 },
+            { k: "QV1", v: toVerifyData.length, hi: 4 },
+            { k: "QP",  v: inProduction.length, hi: 3 },
+            { k: "QV2", v: finalCheck.length,   hi: 3 },
+          ].map(({ k, v, hi }) => (
+            <div key={k} style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "6px 4px", textAlign: "center" }}>
+              <div style={{ ...TM, color: v >= hi ? "#FF4444" : v > 0 ? "#FFB800" : "#3FB950", fontSize: 17, fontWeight: 700, lineHeight: 1 }}>{v}</div>
+              <div style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 1, marginTop: 2 }}>{k}</div>
+            </div>
+          ))}
+          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 7, padding: "6px 8px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 1 }}>PRESSURE</span>
+              <span style={{ ...TM, color: chainPressure >= 70 ? "#FF4444" : chainPressure >= 45 ? "#FFB800" : "#3FB950", fontSize: 7 }}>{chainPressure}%</span>
+            </div>
+            <div style={{ height: 4, background: "rgba(0,0,0,0.4)", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ width: `${chainPressure}%`, height: "100%", background: chainPressure >= 70 ? "#FF4444" : chainPressure >= 45 ? "#FFB800" : "#3FB950", transition: "width .25s ease" }} />
+            </div>
+          </div>
         </div>
 
-        <div style={{ height: 8, background: C.paper2, borderRadius: 20, overflow: "hidden", marginBottom: 11 }}>
-          <div style={{ width: `${chainPressure}%`, height: "100%", background: chainPressure >= 70 ? C.clay : chainPressure >= 45 ? C.amber : C.green, transition: "width .25s ease" }} />
+        {/* Drive-thru + hottest + chain toast row */}
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <div className={bell.bellActive ? "alarm-pulse" : ""} style={{ flex: "1 1 130px", background: bell.bellActive ? "rgba(255,68,68,0.18)" : "rgba(0,0,0,0.25)", borderRadius: 7, padding: "6px 10px", border: bell.bellActive ? "1px solid rgba(255,68,68,0.5)" : "1px solid transparent" }}>
+            <div style={{ ...TM, color: bell.bellActive ? "#FF4444" : "#3A6070", fontSize: 7, letterSpacing: 1.5 }}>DRIVE-THRU</div>
+            <div style={{ ...TM, color: bell.bellActive ? "#FF4444" : "#3FB950", fontSize: 12, fontWeight: 700, marginTop: 2 }}>{bell.bellActive ? "▶ RINGING" : `${bell.bellCount} triggers`}</div>
+          </div>
+          <div style={{ flex: "1 1 130px", background: "rgba(0,0,0,0.25)", borderRadius: 7, padding: "6px 10px" }}>
+            <div style={{ ...TM, color: "#3A6070", fontSize: 7, letterSpacing: 1.5 }}>HOTTEST PATIENT</div>
+            <div style={{ ...TM, color: hottest && patientLeftMs(hottest) < 15000 ? "#FF4444" : "#E8F4F8", fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+              {hottest ? `${Math.ceil(patientLeftMs(hottest) / 1000)}s left` : "● CLEAR"}
+            </div>
+          </div>
+          {chainToast && (
+            <div className="pop" style={{ flex: "1 1 130px", background: "rgba(63,185,80,0.15)", border: "1px solid rgba(63,185,80,0.3)", borderRadius: 7, padding: "6px 10px", ...TM, color: "#3FB950", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center" }}>
+              {chainToast}
+            </div>
+          )}
         </div>
+      </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(142px, 1fr))", gap: 8 }}>
+      <ProgressBar value={(completed / Math.max(total, 1)) * 100} />
+
+      {/* ── CHAIN TASKS ── */}
+      <div style={{ background: "#FFFFFF", borderRadius: 10, border: "1px solid #D0D8E0", padding: "10px 12px", margin: "10px 0" }}>
+        <div style={{ ...TM, color: "#5A7080", fontSize: 8, letterSpacing: 1.5, marginBottom: 8 }}>SERVICE QUEUE — TAP TO CLEAR</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 7 }}>
           {CHAIN_TASKS.map((task) => <ChainTaskButton key={task.id} task={task} />)}
         </div>
-        {chainToast && (
-          <div className="pop" style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(46,139,87,0.12)", border: `1px solid ${C.green}`, color: C.pine, fontWeight: 800, fontSize: 13 }}>
-            {chainToast}
-          </div>
-        )}
       </div>
 
-      <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 16px", lineHeight: 1.5 }}>
-        Big-chain shift loop: verify QT/QV1, keep QP moving, clear QV2 final checks, and keep phones, pickup, drive-thru, counseling, and waiters under control.
-      </p>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <div className={bell.bellActive ? "alarm-pulse" : ""} style={{
-          padding: 12, borderRadius: 12, border: `1px solid ${bell.bellActive ? C.clay : C.line}`,
-          background: bell.bellActive ? "rgba(178,58,36,0.12)" : C.card,
-        }}>
-          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1, color: bell.bellActive ? C.clay : C.muted, textTransform: "uppercase" }}>
-            Drive-thru bell
-          </div>
-          <div className="display" style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
-            {bell.bellActive ? "RINGING" : `${bell.bellCount} triggers`}
-          </div>
-        </div>
-        <div style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.line}`, background: C.card }}>
-          <div className="mono" style={{ fontSize: 9.5, letterSpacing: 1, color: C.muted, textTransform: "uppercase" }}>
-            Hottest patient
-          </div>
-          <div className="display" style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
-            {hottest ? `${Math.ceil(patientLeftMs(hottest) / 1000)}s` : "Clear"}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-        <Column title="QT / QV1 Data" count={toVerifyData.length}>
-          {!toVerifyData.length && <EmptyLane text="No data-entry scripts waiting." />}
+      {/* ── PATIENT COLUMNS ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+        <Column title="QT / QV1 DATA" count={toVerifyData.length} color="#3FB950">
+          {!toVerifyData.length && <EmptyLane text="No scripts in queue." />}
           {toVerifyData.map((rx) => (
-            <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
-              <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
-              <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
-              <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Qty {rx.qty} · {rx.sig}</div>
-              <PressureMeter rx={rx} />
-              <button onClick={() => approveData(rx)}
-                style={btn(C.green, "#fff", { width: "100%", marginTop: 10, padding: "9px 12px", fontSize: 13, borderRadius: 10, background: C.green })}>
-                Verify QV1
-              </button>
+            <div key={rx.id} style={{ background: "#FFFFFF", borderRadius: 8, overflow: "hidden", border: "1px solid #D0D8E0" }}>
+              <div style={{ background: "#143520", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 600 }}>{rx.patient}</span>
+                <span style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 1 }}>{rx.lane?.toUpperCase()}</span>
+              </div>
+              <div style={{ padding: "8px 10px 10px" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
+                <div style={{ ...TM, color: "#5A7080", fontSize: 10, marginTop: 3 }}>Qty {rx.qty} · {rx.sig}</div>
+                <PressureMeter rx={rx} />
+                <button onClick={() => approveData(rx)} style={{ ...TM, width: "100%", marginTop: 9, padding: "8px 0", background: "#3FB950", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                  ▶ VERIFY QV1
+                </button>
+              </div>
             </div>
           ))}
         </Column>
 
-        <Column title="QP Production" count={inProduction.length}>
-          {!inProduction.length && <EmptyLane text="No tech fills running." />}
+        <Column title="QP PRODUCTION" count={inProduction.length} color="#FFB800">
+          {!inProduction.length && <EmptyLane text="No fills running." />}
           {inProduction.map((rx) => {
             const remaining = Math.max(0, Math.ceil((rx.readyAt - now) / 1000));
             const pct = Math.min(100, Math.max(0, ((rx.etaMs - Math.max(0, rx.readyAt - now)) / rx.etaMs) * 100));
             return (
-              <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
-                <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
-                <div style={{ color: C.muted, fontSize: 13.5, marginTop: 3 }}>{rx.drug} {rx.strength}</div>
-                <div className="mono" style={{ color: C.amber, fontSize: 11, marginTop: 5 }}>QP fill running: {remaining}s</div>
-                <div style={{ height: 7, background: C.paper2, borderRadius: 20, overflow: "hidden", marginTop: 9 }}>
-                  <div style={{ width: `${pct}%`, height: "100%", background: C.amber, transition: "width .25s linear" }} />
+              <div key={rx.id} style={{ background: "#FFFFFF", borderRadius: 8, overflow: "hidden", border: "1px solid #D0D8E0" }}>
+                <div style={{ background: "#2A1F00", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 600 }}>{rx.patient}</span>
+                  <span style={{ ...TM, color: "#FFB800", fontSize: 8, letterSpacing: 1 }}>FILLING</span>
                 </div>
-                <PressureMeter rx={rx} />
+                <div style={{ padding: "8px 10px 10px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
+                  <div style={{ ...TM, color: "#FFB800", fontSize: 10, marginTop: 3 }}>FILL RUNNING — {remaining}s</div>
+                  <div style={{ height: 4, background: "#E8EDF1", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: "#FFB800", transition: "width .25s linear" }} />
+                  </div>
+                  <PressureMeter rx={rx} />
+                </div>
               </div>
             );
           })}
         </Column>
 
-        <Column title="QV2 Final Check" count={finalCheck.length}>
+        <Column title="QV2 FINAL CHECK" count={finalCheck.length} color="#7EB8C9">
           {!finalCheck.length && <EmptyLane text="No filled vials ready yet." />}
           {finalCheck.map((rx) => {
             const f = rx.fillCase.fill;
             const needsReject = rx.fillCase.errorField !== null;
             return (
-              <div key={rx.id} className="rx-card" style={{ padding: 14 }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <VialScatter p={f.pill} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14.5 }}>{rx.patient}</div>
-                    <div style={{ color: C.muted, fontSize: 13.2 }}>{rx.drug} {rx.strength}</div>
-                    <div className="mono" style={{ color: C.muted, fontSize: 11, marginTop: 5 }}>Shape: {f.pill.shape}</div>
-                    <div className="mono" style={{ color: C.muted, fontSize: 11 }}>Imprint: {f.pill.imprint}</div>
+              <div key={rx.id} style={{ background: "#FFFFFF", borderRadius: 8, overflow: "hidden", border: `1px solid ${needsReject ? "#FFB80066" : "#D0D8E0"}` }}>
+                <div style={{ background: needsReject ? "#2A1A00" : "#0B2A3F", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 600 }}>{rx.patient}</span>
+                  <span style={{ ...TM, color: needsReject ? "#FFB800" : "#7EB8C9", fontSize: 8, letterSpacing: 1 }}>{needsReject ? "⚠ CHECK" : "QV2"}</span>
+                </div>
+                <div style={{ padding: "8px 10px 4px" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                    <VialScatter p={f.pill} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
+                      <div style={{ ...TM, color: "#5A7080", fontSize: 9, marginTop: 2 }}>Imprint: {f.pill.imprint} · {f.pill.shape}</div>
+                    </div>
                   </div>
+                <div style={{ ...TM, marginTop: 7, padding: "6px 8px", borderRadius: 6, background: needsReject ? "rgba(255,184,0,0.08)" : "#F7F9FB", fontSize: 10, color: needsReject ? "#FFB800" : "#5A7080", border: `1px solid ${needsReject ? "#FFB80044" : "#D0D8E0"}` }}>
+                  {f.stockDrug} {f.stockStrength} · Count {f.count} · Shape: {f.pill.shape}
                 </div>
-                <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(31,74,63,0.05)", fontSize: 12.5, color: C.muted }}>
-                  Stock: {f.stockDrug} {f.stockStrength} · Count {f.count}
+                <div style={{ ...TM, color: needsReject ? "#FFB800" : "#8A9AAA", fontSize: 9, marginTop: 5, letterSpacing: 0.5 }}>
+                  {needsReject ? "⚠ POSSIBLE ERROR — review before approving" : "Review stock, count, and label before clearing."}
                 </div>
-                <div className="mono" style={{ color: needsReject ? C.amber : C.muted, fontSize: 10.5, marginTop: 7 }}>Review stock, count, vial pills, and label before clearing.</div>
                 <PressureMeter rx={rx} />
-                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <button onClick={() => finalAction(rx, "reject")}
-                    style={btn("transparent", C.clay, { border: `1px solid ${C.clay}`, flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10 })}>
-                    Reject
+                <div style={{ display: "flex", gap: 7, marginTop: 9 }}>
+                  <button onClick={() => finalAction(rx, "reject")} style={{ ...TM, flex: 1, padding: "8px 0", background: "rgba(178,58,36,0.08)", border: "1px solid rgba(178,58,36,0.4)", color: C.clay, borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer" }}>
+                    REJECT
                   </button>
-                  <button onClick={() => finalAction(rx, "approve")}
-                    style={btn(C.green, "#fff", { flex: 1, padding: "9px 8px", fontSize: 12.5, borderRadius: 10, background: C.green })}>
-                    Approve
+                  <button onClick={() => finalAction(rx, "approve")} style={{ ...TM, flex: 1, padding: "8px 0", background: "#3FB950", border: "none", color: "#FFFFFF", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer" }}>
+                    APPROVE
                   </button>
                 </div>
               </div>
@@ -5256,8 +5249,8 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
         </Column>
       </div>
 
-      <button onClick={onQuit} style={btn("transparent", C.muted, { border: `1px solid ${C.line}`, width: "100%", marginTop: 14, fontSize: 13 })}>
-        Quit to home
+      <button onClick={onQuit} style={{ ...TM, background: "transparent", border: "1px solid #D0D8E0", color: "#8A9AAA", borderRadius: 8, width: "100%", marginTop: 12, padding: "9px 0", cursor: "pointer", fontSize: 11 }}>
+        CLOCK OUT / HOME
       </button>
 
       {malpracticeFlash && (
@@ -5341,25 +5334,27 @@ function CareerMode({ level, onQuit }) {
     setPhase("dashboard");
   }
 
+  const TM = { fontFamily: "'Spline Sans Mono',monospace" };
+
   const HeaderStat = ({ label, value, color }) => (
-    <div style={{ minWidth: 112, padding: "10px 12px", borderRadius: 12, border: `1px solid ${C.line}`, background: "rgba(255,255,255,0.46)" }}>
-      <div className="display" style={{ fontSize: 20, fontWeight: 900, color: color || C.ink, lineHeight: 1 }}>{value}</div>
-      <div className="mono" style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{label}</div>
+    <div style={{ minWidth: 100, padding: "8px 12px", borderRadius: 8, border: "1px solid #1E3A52", background: "rgba(255,255,255,0.06)" }}>
+      <div style={{ ...TM, fontSize: 18, fontWeight: 700, color: color || "#E8F4F8", lineHeight: 1 }}>{value}</div>
+      <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", textTransform: "uppercase", letterSpacing: 1.2, marginTop: 4 }}>{label}</div>
     </div>
   );
 
   const careerHeader = (
-    <div className="rx-card" style={{ padding: 14, marginBottom: 14, position: "sticky", top: 8, zIndex: 40 }}>
+    <div style={{ background: "#0B1F3A", borderRadius: 10, padding: "10px 14px", marginBottom: 14, position: "sticky", top: 8, zIndex: 40 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
-          <div className="pixel" style={{ fontSize: 10, color: C.amber, marginBottom: 6 }}>RETAIL CHAIN CAREER</div>
-          <div className="display" style={{ fontSize: 25, fontWeight: 900, lineHeight: 1 }}>Chain Pharmacy Shift</div>
+          <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", letterSpacing: 2, marginBottom: 4 }}>RXPRO — CAREER MODE</div>
+          <div style={{ ...TM, fontSize: 16, fontWeight: 700, color: "#E8F4F8", lineHeight: 1 }}>Chain Pharmacy Career</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <HeaderStat label="Bank" value={money(bankBalance)} color={bankBalance >= 0 ? C.green : C.clay} />
-          <HeaderStat label="Hourly" value={money(hourlyRate)} color={C.pine} />
-          <HeaderStat label="Day" value={dayCount} color={C.amber} />
-          <HeaderStat label="Clean" value={`${consecutiveCleanShifts}/3`} color={consecutiveCleanShifts >= 2 ? C.green : C.muted} />
+          <HeaderStat label="Bank" value={money(bankBalance)} color={bankBalance >= 0 ? "#3FB950" : "#FF4444"} />
+          <HeaderStat label="Hourly" value={money(hourlyRate)} color="#7EB8C9" />
+          <HeaderStat label="Day" value={dayCount} color="#E8F4F8" />
+          <HeaderStat label="Clean" value={`${consecutiveCleanShifts}/3`} color={consecutiveCleanShifts >= 2 ? "#3FB950" : "#4A8FA5"} />
         </div>
       </div>
     </div>
@@ -5412,13 +5407,13 @@ function CareerMode({ level, onQuit }) {
           background: "linear-gradient(135deg, #ffe08a, #f2b441 42%, #fff5cc)",
           border: "4px solid #fff", boxShadow: "0 26px 60px -24px rgba(192,120,30,0.95)",
         }}>
-          <div className="pixel blink" style={{ fontSize: 12, color: C.clay, marginBottom: 14 }}>PROMOTION EARNED</div>
+          <div className="pixel blink" style={{ fontSize: 12, color: "#B05C10", marginBottom: 14 }}>PROMOTION EARNED</div>
           <div className="display" style={{ fontSize: 40, fontWeight: 900, lineHeight: 1 }}>Hourly Rate Up</div>
           <p style={{ maxWidth: 450, margin: "16px auto 0", lineHeight: 1.5, fontWeight: 700 }}>
             Three clean shifts in a row. Corporate bumped you from {money(promotion.from)} to {money(promotion.to)} per hour.
           </p>
-          <button onClick={() => setPhase("dashboard")} style={btn(C.pine, "#fff", { marginTop: 20, minWidth: 220 })}>
-            Continue career
+          <button onClick={() => setPhase("dashboard")} style={{ fontFamily: "'Spline Sans Mono',monospace", marginTop: 20, minWidth: 220, padding: "12px 20px", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer", textTransform: "uppercase" }}>
+            ▶ CONTINUE CAREER
           </button>
         </div>
       </div>
@@ -5428,33 +5423,32 @@ function CareerMode({ level, onQuit }) {
   return (
     <div className="rise">
       {careerHeader}
-      <div className="rx-card" style={{ padding: 22, overflow: "hidden", position: "relative" }}>
-        <div style={{ position: "absolute", right: -28, top: -24, fontSize: 126, opacity: 0.06, fontFamily: "'Fraunces',serif" }}>$</div>
-        <div className="mono" style={{ fontSize: 10, letterSpacing: 1, color: C.amber, textTransform: "uppercase", marginBottom: 10 }}>
-          Day {dayCount} / Retail Chain Career
+      <div style={{ background: "#FFFFFF", borderRadius: 10, border: "1px solid #D0D8E0", padding: 22, overflow: "hidden", position: "relative", boxShadow: "0 2px 10px rgba(0,20,40,0.07)" }}>
+        <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>
+          DAY {dayCount} — RETAIL CHAIN CAREER
         </div>
-        <div className="display" style={{ fontSize: 31, fontWeight: 900, lineHeight: 1.05, marginBottom: 10 }}>
+        <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 18, fontWeight: 700, color: "#0B1F3A", lineHeight: 1.15, marginBottom: 10 }}>
           Clock in. Clear the queues. Keep the store alive.
         </div>
-        <p style={{ color: C.muted, lineHeight: 1.55, margin: "0 0 18px", maxWidth: 520 }}>
-          Work a CVS-style retail pharmacy shift without official branding: QT/QV1/QP/QV2 queues, phones, pickup, drive-thru, counsel calls, waiters, metrics, and final-check consequences.
+        <p style={{ color: "#5A7080", lineHeight: 1.55, margin: "0 0 18px", maxWidth: 520, fontSize: 13.5 }}>
+          QT/QV1/QP/QV2 queues, phones, pickup, drive-thru, counsel calls, waiters, metrics, and final-check consequences.
           Three clean shifts in a row earns an automatic raise.
         </p>
 
         {lastShift && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 10, marginBottom: 18 }}>
-            <HeaderStat label="Last net" value={money(lastShift.netProfit)} color={lastShift.netProfit >= 0 ? C.green : C.clay} />
-            <HeaderStat label="Bonuses" value={money(lastShift.totalBonuses || 0)} color={C.green} />
-            <HeaderStat label="Penalties" value={money(lastShift.totalPenalties || 0)} color={lastShift.totalPenalties ? C.clay : C.muted} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 10, marginBottom: 18, padding: "12px 14px", background: "#0B1F3A", borderRadius: 8 }}>
+            <HeaderStat label="Last net" value={money(lastShift.netProfit)} color={lastShift.netProfit >= 0 ? "#3FB950" : "#FF4444"} />
+            <HeaderStat label="Bonuses" value={money(lastShift.totalBonuses || 0)} color="#3FB950" />
+            <HeaderStat label="Penalties" value={money(lastShift.totalPenalties || 0)} color={lastShift.totalPenalties ? "#FF4444" : "#4A8FA5"} />
           </div>
         )}
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={() => setPhase("shift")} style={btn(C.pine, "#fff", { flex: "1 1 220px", background: C.pine })}>
-            Start Shift
+          <button onClick={() => setPhase("shift")} style={{ ...TM, flex: "1 1 220px", padding: "12px 20px", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer", textTransform: "uppercase" }}>
+            ▶ CLOCK IN — START SHIFT
           </button>
-          <button onClick={onQuit} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, flex: "0 1 150px" })}>
-            Exit career
+          <button onClick={onQuit} style={{ ...TM, flex: "0 1 150px", padding: "12px 16px", background: "transparent", color: "#4A8FA5", border: "1px solid #D0D8E0", borderRadius: 8, fontSize: 11, cursor: "pointer", letterSpacing: 1 }}>
+            EXIT CAREER
           </button>
         </div>
       </div>
