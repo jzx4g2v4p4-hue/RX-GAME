@@ -148,6 +148,17 @@ const MODES = [
   },
 ];
 
+const SHIFT_CONTEXTS = [
+  { time: "MON 9:12 AM", mood: "steady",       queue: 11, banner: "Monday morning · 11 scripts in queue · Printer jammed twice already",              npc: "Hey, tech just called out sick. It's just us today." },
+  { time: "FRI 4:53 PM", mood: "slammed",       queue: 22, banner: "Friday rush · Drive-through backed up · Phones ringing off the hook",              npc: "Can someone get the phone? I'm still on hold with Caremark." },
+  { time: "TUE 1:30 PM", mood: "moderate",      queue:  8, banner: "Lunch wave · 8 scripts in queue · Pharmacist verifying CIIs",                      npc: "Heads-up — patient in will-call says we shorted her by 4 tablets." },
+  { time: "SAT 11:00 AM", mood: "slammed",      queue: 19, banner: "Saturday rush · Short-staffed today · Drive-through: 6 cars",                      npc: "District manager is doing a walk-through at noon. Look busy." },
+  { time: "WED 3:15 PM", mood: "moderate",      queue:  6, banner: "Mid-afternoon · 6 in queue · Drive-through: clear · Pharmacist on consult",        npc: "New intern starts today — show them where the rejects go." },
+  { time: "THU 6:45 PM", mood: "winding-down",  queue:  3, banner: "Closing shift · 3 scripts left · Don't forget end-of-day controlled count",        npc: "Whoever closes last — lock the safe before you leave." },
+  { time: "MON 2:00 PM", mood: "moderate",      queue:  9, banner: "Post-lunch wave · 9 in queue · Insurance line on hold for 20 min",                  npc: "Just rejected a script — member ID mismatch. Needs reprocessing." },
+  { time: "SUN 12:30 PM", mood: "steady",       queue:  7, banner: "Sunday midday · 7 in queue · Pharmacist solo coverage today",                      npc: "No tech until 2, so you're handling data entry and phones both." },
+];
+
 const MODE_GROUPS = [
   {
     id: "career",
@@ -5844,12 +5855,16 @@ function FillMode({ level, onFinish, onQuit }) {
   const [locked, setLocked] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [total, setTotal] = useState(0);
+  const [shift] = useState(() => SHIFT_CONTEXTS[Math.floor(Math.random() * SHIFT_CONTEXTS.length)]);
+  const [rxNums] = useState(() => Array.from({ length: 20 }, () => Math.floor(1000000 + Math.random() * 8999999)));
+  const [showNpc, setShowNpc] = useState(false);
 
   const c = cases[ci];
   if (!c) return <Empty onQuit={onQuit} />;
   const step = c.steps[si];
   const totalSteps = cases.reduce((n, x) => n + x.steps.length, 0);
   const doneSteps = cases.slice(0, ci).reduce((n, x) => n + x.steps.length, 0) + si;
+  const queueNow = shift.queue - ci;
 
   function answer(i) {
     if (locked) return;
@@ -5858,39 +5873,102 @@ function FillMode({ level, onFinish, onQuit }) {
   }
   function next() {
     if (si + 1 < c.steps.length) { setSi(si + 1); setSelected(null); setLocked(false); return; }
-    if (ci + 1 < cases.length) { setCi(ci + 1); setSi(0); setSelected(null); setLocked(false); return; }
+    if (ci + 1 < cases.length) {
+      setCi(ci + 1); setSi(0); setSelected(null); setLocked(false);
+      if (shift.mood === "slammed" && Math.random() > 0.4) setShowNpc(true);
+      return;
+    }
     onFinish({ mode: 2, correct: correct, total: total, rxFilled: cases.length });
   }
 
   return (
     <div className="rise">
+      {/* Shift status bar */}
+      <div style={{
+        background: "#0B1F3A", color: "#7EB8C9", borderRadius: 10,
+        padding: "7px 13px", marginBottom: 10,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5, gap: 8,
+      }}>
+        <span style={{ whiteSpace: "nowrap", opacity: 0.75 }}>● {shift.time}</span>
+        <span style={{ flex: 1, textAlign: "center", opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shift.banner}</span>
+        <span style={{
+          background: queueNow > 12 ? "#7A1A1A" : queueNow > 6 ? "#4A3A0A" : "#0A3A1A",
+          color: "#fff", borderRadius: 5, padding: "2px 8px", fontWeight: 700,
+          whiteSpace: "nowrap", fontSize: 11,
+        }}>QUEUE: {queueNow}</span>
+      </div>
+
+      {/* Coworker NPC pop-in */}
+      {showNpc && (
+        <div className="pop" style={{
+          background: C.card, border: `1.5px solid ${C.amber}`, borderRadius: 10,
+          padding: "9px 13px", marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 8,
+        }}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>👤</span>
+          <div style={{ flex: 1, fontSize: 13, color: C.ink, lineHeight: 1.4 }}>
+            <span style={{ fontWeight: 700, color: C.amber }}>Coworker: </span>{shift.npc}
+          </div>
+          <button onClick={() => setShowNpc(false)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Prescription {ci + 1} of {cases.length}</span>
+        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Script {ci + 1} of {cases.length}</span>
         <span className="mono" style={{ fontSize: 12, color: C.pine, fontWeight: 600 }}>{correct}/{total} verified</span>
       </div>
       <ProgressBar value={(doneSteps / totalSteps) * 100} />
 
-      {/* Rx label */}
-      <div className="rx-card" style={{ padding: 0, marginTop: 16, overflow: "hidden" }}>
-        <div style={{ background: C.pine, color: C.paper, padding: "10px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="display" style={{ fontWeight: 900, fontSize: 20 }}>℞ Prescription</span>
-          <span className="mono" style={{ fontSize: 11, opacity: 0.8 }}>{c.refills}</span>
+      {/* Pharmacy terminal card */}
+      <div style={{ borderRadius: 13, overflow: "hidden", marginTop: 14, border: "1.5px solid #0B1F3A", boxShadow: "0 4px 18px rgba(11,31,58,0.15)" }}>
+        {/* Terminal header */}
+        <div style={{
+          background: "#0B1F3A", padding: "8px 14px",
+          display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
+          fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5,
+        }}>
+          <span style={{ color: "#7EB8C9", fontWeight: 700, letterSpacing: 0.5 }}>RxPRO DISPENSING</span>
+          <span style={{ color: "rgba(126,184,201,0.55)", textAlign: "center" }}>STATION 1</span>
+          <span style={{ color: "#7EB8C9", textAlign: "right", opacity: 0.75 }}>RX# {rxNums[ci]}</span>
         </div>
-        <div style={{ padding: "16px 18px", fontFamily: "'Spline Sans Mono', monospace", fontSize: 13.5, lineHeight: 1.7 }}>
-          <div style={{ color: C.muted }}>{c.patient}</div>
-          <div style={{ color: C.muted, marginBottom: 8 }}>{c.prescriber}</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: C.ink }}>{c.drug}</div>
-          <div style={{ color: C.pineSoft, fontWeight: 600 }}>Sig: {c.sig}</div>
-          <div style={{ color: C.muted }}>Disp: {c.qty}</div>
+        {/* Label body */}
+        <div style={{ background: "#FAFAF7", padding: "13px 16px", fontFamily: "'Spline Sans Mono', monospace" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "max-content 1fr", columnGap: 12, rowGap: 3, fontSize: 11.5 }}>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>PATIENT</span>
+            <span style={{ color: "#1A2A24", fontWeight: 500 }}>{c.patient}</span>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>PRESCRIBER</span>
+            <span style={{ color: "#1A2A24" }}>{c.prescriber}</span>
+          </div>
+          <div style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "10px 0" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "max-content 1fr", columnGap: 12, rowGap: 3, fontSize: 11.5 }}>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>DRUG</span>
+            <span style={{ color: "#1A2A24", fontWeight: 700, fontSize: 13 }}>{c.drug}</span>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>SIG</span>
+            <span style={{ color: "#1F4A3F", fontWeight: 700 }}>{c.sig}</span>
+            <span style={{ color: "#5A6A6C", fontWeight: 700, letterSpacing: 0.4 }}>QTY</span>
+            <span style={{ color: "#1A2A24" }}>{c.qty}&nbsp;&nbsp;
+              <span style={{ color: "#5A6A6C" }}>REFILLS:</span>&nbsp;
+              <span style={{ color: "#1A2A24" }}>{c.refills.replace("Refills: ", "")}</span>
+            </span>
+          </div>
+        </div>
+        {/* Footer status bar */}
+        <div style={{
+          background: "#0d2a1e", padding: "5px 14px",
+          display: "flex", justifyContent: "space-between",
+          fontFamily: "'Spline Sans Mono', monospace", fontSize: 10, color: "rgba(126,201,160,0.7)",
+        }}>
+          <span>STATUS: PENDING VERIFICATION</span>
+          <span>STEP {si + 1}/{c.steps.length}</span>
         </div>
       </div>
 
-      {/* step */}
-      <div className="rx-card pop" key={`${ci}-${si}`} style={{ padding: 20, marginTop: 14 }}>
-        <div className="mono" style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: C.amber, marginBottom: 8 }}>
-          Step {si + 1} of {c.steps.length}
+      {/* Verification prompt */}
+      <div className="rx-card pop" key={`${ci}-${si}`} style={{ padding: 20, marginTop: 12 }}>
+        <div className="mono" style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.amber, marginBottom: 8 }}>
+          ▸ Technician check — step {si + 1} of {c.steps.length}
         </div>
-        <h3 style={{ fontSize: 17.5, fontWeight: 700, margin: "0 0 16px", lineHeight: 1.35 }}>{step.prompt}</h3>
+        <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 16px", lineHeight: 1.35 }}>{step.prompt}</h3>
         <Options options={step.options} answer={step.answer} selected={selected} onSelect={answer} locked={locked} />
         {locked && <Explain correct={selected === step.answer} text={step.explain} />}
       </div>
@@ -5898,7 +5976,7 @@ function FillMode({ level, onFinish, onQuit }) {
       {locked && (
         <button onClick={next} style={btn(C.pine, C.paper, { width: "100%", marginTop: 14 })}>
           {ci + 1 >= cases.length && si + 1 >= c.steps.length ? "Finish shift" :
-            si + 1 >= c.steps.length ? "Next prescription →" : "Next step →"}
+            si + 1 >= c.steps.length ? "Next script →" : "Next step →"}
         </button>
       )}
     </div>
@@ -5918,6 +5996,7 @@ function CounterMode({ skills, level, onFinish, onQuit }) {
   const [locked, setLocked] = useState(false);
   const [rating, setRating] = useState(70);
   const [counts, setCounts] = useState({ best: 0, ok: 0, bad: 0 });
+  const [shift] = useState(() => SHIFT_CONTEXTS[Math.floor(Math.random() * SHIFT_CONTEXTS.length)]);
 
   const sc = pool[idx];
   if (!sc) return <Empty onQuit={onQuit} />;
@@ -5941,6 +6020,18 @@ function CounterMode({ skills, level, onFinish, onQuit }) {
 
   return (
     <div className="rise">
+      {/* Shift status bar */}
+      <div style={{
+        background: "#0B1F3A", color: "#7EB8C9", borderRadius: 10,
+        padding: "7px 13px", marginBottom: 10,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5, gap: 8,
+      }}>
+        <span style={{ whiteSpace: "nowrap", opacity: 0.75 }}>● {shift.time}</span>
+        <span style={{ flex: 1, textAlign: "center", opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shift.banner}</span>
+        <span style={{ color: "rgba(126,184,201,0.6)", whiteSpace: "nowrap" }}>COUNTER</span>
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <span className="mono" style={{ fontSize: 12, color: C.muted }}>Patient {idx + 1} / {pool.length}</span>
         <span className="mono" style={{ fontSize: 12, color: ratingColor, fontWeight: 600 }}>Shift rating {rating}</span>
