@@ -4820,6 +4820,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   const [chainXp, setChainXp] = useState(0);
   const [chainStreak, setChainStreak] = useState(0);
   const [chainToast, setChainToast] = useState(null);
+  const [verifyModal, setVerifyModal] = useState(null);
   const timers = useRef({});
   const pendingSummaryRef = useRef(null);
   const bellPenaltyRef = useRef(0);
@@ -5071,6 +5072,222 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       </button>
     );
   };
+  function prescriberFor(drug) {
+    const d = (drug || "").toLowerCase();
+    if (d.includes("metoprolol") || d.includes("verapamil") || d.includes("amlodipine"))
+      return { name: "Dr. J. Carver, MD", spec: "Cardiology", npi: "NPI 1609872340", phone: "(804) 555-0118" };
+    if (d.includes("lisinopril") || d.includes("atorvastatin") || d.includes("warfarin"))
+      return { name: "Dr. S. Okafor, MD", spec: "Internal Medicine", npi: "NPI 1245870961", phone: "(804) 555-0142" };
+    if (d.includes("sertraline") || d.includes("lamotrigine"))
+      return { name: "Dr. L. Webb, PMHNP", spec: "Psychiatry / Neurology", npi: "NPI 1376082451", phone: "(804) 555-0271" };
+    if (d.includes("metformin") || d.includes("levothyroxine"))
+      return { name: "Dr. A. Chen, MD", spec: "Endocrinology", npi: "NPI 1457823091", phone: "(804) 555-0399" };
+    return { name: "Dr. P. Quinn, MD", spec: "Family Medicine", npi: "NPI 1023948576", phone: "(804) 555-0087" };
+  }
+  function patientDob(patient) {
+    const h = (patient || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    return `${String((h % 12) + 1).padStart(2, "0")}/${String(((h * 7) % 28) + 1).padStart(2, "0")}/${1945 + (h % 50)}`;
+  }
+  function refillsFor(drug) {
+    const d = (drug || "").toLowerCase();
+    if (d.includes("amoxicillin") || d.includes("azithromycin") || d.includes("cephalexin") || d.includes("warfarin")) return 0;
+    if (d.includes("sertraline") || d.includes("levothyroxine") || d.includes("metformin") || d.includes("lisinopril")) return 11;
+    return 5;
+  }
+  const scriptWrittenDate = (() => { const d = new Date(); d.setDate(d.getDate() - 3); return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }); })();
+
+  const ScriptModal = ({ vm, onClose }) => {
+    const rx = vm.rx;
+    const c = rx.fillCase;
+    const f = c.fill;
+    const ref = c.ref;
+    const prescriber = prescriberFor(rx.drug);
+    const dob = patientDob(rx.patient);
+    const refills = refillsFor(rx.drug);
+
+    const drugStrOk = `${f.stockDrug} ${f.stockStrength}`.toLowerCase() === `${rx.drug} ${rx.strength}`.toLowerCase();
+    const countOk = String(f.count) === String(rx.qty);
+    const pillOk = f.pill.imprint === ref.pill.imprint && f.pill.shape === ref.pill.shape;
+    const lPatOk = f.labelPatient === rx.patient;
+    const lSigOk = c.errorField !== "label" || !lPatOk;
+
+    const CheckRow = ({ label, ok, expected, actual }) => (
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "7px 0", borderBottom: "1px solid #EEF1F4" }}>
+        <div style={{ ...TM, flexShrink: 0, width: 18, height: 18, borderRadius: 4, background: ok ? "rgba(63,185,80,0.12)" : "rgba(255,184,0,0.15)", border: `1px solid ${ok ? "#3FB95055" : "#FFB80055"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ok ? "#3FB950" : "#FFB800", marginTop: 1 }}>{ok ? "✓" : "⚠"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...TM, fontSize: 8, color: "#5A7080", letterSpacing: 1, textTransform: "uppercase" }}>{label}</div>
+          {ok
+            ? <div style={{ ...TM, fontSize: 10, color: "#3FB950", marginTop: 2 }}>{expected}</div>
+            : <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 3 }}>
+                <div style={{ ...TM, fontSize: 10, color: "#0B1F3A" }}>Rx: <span style={{ fontWeight: 700 }}>{expected}</span></div>
+                <div style={{ ...TM, fontSize: 10, color: "#FFB800", fontWeight: 700 }}>Filled: {actual}</div>
+              </div>
+          }
+        </div>
+      </div>
+    );
+
+    const ModalWrap = ({ children }) => (
+      <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(7,21,35,0.94)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "12px", overflowY: "auto" }}>
+        <div style={{ width: "min(500px,100%)", background: "#F2F5F7", borderRadius: 12, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.7)" }}>
+          {children}
+        </div>
+      </div>
+    );
+
+    const ModalHeader = ({ title, sub }) => (
+      <div style={{ background: "#0B1F3A", padding: "12px 16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2 }}>RXPRO — {title}</div>
+            <div style={{ ...TM, color: "#E8F4F8", fontSize: 13, fontWeight: 700, marginTop: 3 }}>{sub}</div>
+          </div>
+          <button onClick={onClose} style={{ ...TM, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#7EB8C9", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 10, letterSpacing: 1 }}>✕ CLOSE</button>
+        </div>
+        <div style={{ marginTop: 10 }}><PressureMeter rx={rx} /></div>
+      </div>
+    );
+
+    if (vm.stage === "qv1") return (
+      <ModalWrap>
+        <ModalHeader title="DATA VERIFICATION" sub="QV1 — HARDCOPY REVIEW" />
+
+        <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+          <div style={{ background: "#0B1F3A", padding: "6px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>ℝ PRESCRIPTION — HARDCOPY</span>
+            <span style={{ ...TM, color: "#4A8FA5", fontSize: 8 }}>{rx.lane?.toUpperCase()} · HC</span>
+          </div>
+          <div style={{ padding: "10px 14px", borderBottom: "1px dashed #E0E8EF" }}>
+            <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 3 }}>PATIENT</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
+            <div style={{ ...TM, fontSize: 10, color: "#5A7080", marginTop: 2 }}>DOB: {dob}</div>
+          </div>
+          <div style={{ padding: "10px 14px", borderBottom: "1px dashed #E0E8EF" }}>
+            <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 3 }}>PRESCRIBER</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#0B1F3A" }}>{prescriber.name}</div>
+            <div style={{ ...TM, fontSize: 10, color: "#5A7080", marginTop: 2 }}>{prescriber.spec} · {prescriber.npi}</div>
+            <div style={{ ...TM, fontSize: 10, color: "#5A7080", marginTop: 1 }}>Ph: {prescriber.phone} · Written: {scriptWrittenDate}</div>
+          </div>
+          <div style={{ padding: "10px 14px" }}>
+            <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1.5, marginBottom: 5 }}>℞ PRESCRIBED</div>
+            <div style={{ fontSize: 19, fontWeight: 800, color: "#0B1F3A", lineHeight: 1.1 }}>{rx.drug}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A4060", marginTop: 2 }}>{rx.strength}</div>
+            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+              {[["DISPENSE", `#${rx.qty}`], ["REFILLS", String(refills)], ["ROUTE", "PO"]].map(([k, v]) => (
+                <div key={k} style={{ background: "#F2F5F7", borderRadius: 6, padding: "6px 8px" }}>
+                  <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1 }}>{k}</div>
+                  <div style={{ ...TM, fontSize: 13, fontWeight: 700, color: "#0B1F3A", marginTop: 2 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 8, background: "#F2F5F7", borderRadius: 6, padding: "7px 10px" }}>
+              <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1, marginBottom: 3 }}>DIRECTIONS (SIG)</div>
+              <div style={{ ...TM, fontSize: 12, fontWeight: 600, color: "#0B1F3A", lineHeight: 1.4 }}>{rx.sig.toUpperCase()}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", margin: "8px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+          <div style={{ background: "#F2F5F7", padding: "6px 12px", borderBottom: "1px solid #D0D8E0" }}>
+            <span style={{ ...TM, fontSize: 9, color: "#5A7080", letterSpacing: 1.5 }}>SYSTEM ENTRY — VERIFY MATCH</span>
+          </div>
+          <div style={{ padding: "4px 12px 8px" }}>
+            {[["Drug / Strength", `${rx.drug} ${rx.strength}`], ["Quantity", `#${rx.qty}`], ["Sig", rx.sig]].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F0F4F7" }}>
+                <span style={{ ...TM, fontSize: 9, color: "#5A7080", letterSpacing: 1 }}>{k}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ ...TM, fontSize: 10, color: "#1A2A35", fontWeight: 600 }}>{v}</span>
+                  <span style={{ ...TM, color: "#3FB950", fontSize: 11 }}>✓</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: "10px 12px 16px", display: "grid", gap: 8 }}>
+          <button onClick={() => { approveData(rx); onClose(); }} style={{ ...TM, padding: "13px 0", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>
+            ✓ APPROVE — RELEASE TO FILL
+          </button>
+          <button onClick={onClose} style={{ ...TM, padding: "10px 0", background: "transparent", color: "#4A8FA5", border: "1px solid #D0D8E0", borderRadius: 8, fontSize: 10, cursor: "pointer", letterSpacing: 1 }}>
+            HOLD — NEEDS CLARIFICATION
+          </button>
+        </div>
+      </ModalWrap>
+    );
+
+    return (
+      <ModalWrap>
+        <ModalHeader title="FINAL VERIFICATION" sub="QV2 — RPh CHECK REQUIRED" />
+
+        <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+          <div style={{ background: "#0B2A3F", padding: "6px 12px" }}>
+            <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>ORIGINAL PRESCRIPTION</span>
+          </div>
+          <div style={{ padding: "10px 14px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#0B1F3A", marginTop: 4 }}>{rx.drug} <span style={{ fontWeight: 600, color: "#1A4060" }}>{rx.strength}</span></div>
+            <div style={{ display: "flex", gap: 20, marginTop: 6 }}>
+              <div><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>DISPENSE</span><span style={{ ...TM, fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>#{rx.qty}</span></div>
+              <div><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>DIRECTIONS</span><span style={{ ...TM, fontSize: 10, color: "#1A2A35" }}>{rx.sig}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", margin: "8px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+          <div style={{ background: "#2A1F00", padding: "6px 12px" }}>
+            <span style={{ ...TM, color: "#FFB800", fontSize: 9, letterSpacing: 1.5 }}>FILLED VIAL — INSPECT NOW</span>
+          </div>
+          <div style={{ padding: "12px 14px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+            <VialScatter p={f.pill} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1A2A35" }}>{f.stockDrug} {f.stockStrength}</div>
+              <div style={{ ...TM, fontSize: 9, color: "#5A7080", marginTop: 3 }}>NDC: {f.stockNdc}</div>
+              <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                <div style={{ background: "#F2F5F7", borderRadius: 6, padding: "5px 8px" }}>
+                  <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1 }}>COUNT</div>
+                  <div style={{ ...TM, fontSize: 15, fontWeight: 700, color: "#0B1F3A", marginTop: 2 }}>{f.count}</div>
+                </div>
+                <div style={{ background: "#F2F5F7", borderRadius: 6, padding: "5px 8px" }}>
+                  <div style={{ ...TM, fontSize: 8, color: "#4A8FA5", letterSpacing: 1 }}>IMPRINT</div>
+                  <div style={{ ...TM, fontSize: 12, fontWeight: 700, color: "#0B1F3A", marginTop: 2 }}>{f.pill.imprint}</div>
+                  <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{f.pill.shape}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ margin: "0 14px 12px", padding: "8px 10px", background: "#FFFBE6", borderRadius: 6, border: "1px solid #FFE08A" }}>
+            <div style={{ ...TM, fontSize: 8, color: "#7A5C00", letterSpacing: 1.5, marginBottom: 4 }}>DISPENSING LABEL</div>
+            <div style={{ ...TM, fontSize: 11, fontWeight: 600, color: "#3A2800" }}>{f.labelPatient}</div>
+            <div style={{ ...TM, fontSize: 11, color: "#3A2800", marginTop: 2 }}>{f.labelDrug}</div>
+            <div style={{ ...TM, fontSize: 10, color: "#5A4400", marginTop: 2, lineHeight: 1.4 }}>{f.labelSig}</div>
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", margin: "8px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+          <div style={{ background: "#F2F5F7", padding: "6px 12px", borderBottom: "1px solid #D0D8E0" }}>
+            <span style={{ ...TM, fontSize: 9, color: "#5A7080", letterSpacing: 1.5 }}>VERIFICATION CHECKLIST</span>
+          </div>
+          <div style={{ padding: "4px 12px 8px" }}>
+            <CheckRow label="Drug / Strength" ok={drugStrOk} expected={`${rx.drug} ${rx.strength}`} actual={`${f.stockDrug} ${f.stockStrength}`} />
+            <CheckRow label="Quantity" ok={countOk} expected={`#${rx.qty}`} actual={`${f.count} counted`} />
+            <CheckRow label="Pill Appearance" ok={pillOk} expected={`${ref.pill.imprint} · ${ref.pill.shape}`} actual={`${f.pill.imprint} · ${f.pill.shape}`} />
+            <CheckRow label="Label — Patient" ok={lPatOk} expected={rx.patient} actual={f.labelPatient} />
+            <CheckRow label="Label — Directions" ok={lSigOk} expected={rx.sig} actual={f.labelSig} />
+          </div>
+        </div>
+
+        <div style={{ padding: "10px 12px 16px", display: "grid", gap: 8 }}>
+          <button onClick={() => { finalAction(rx, "approve"); onClose(); }} style={{ ...TM, padding: "13px 0", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>
+            ✓ APPROVE — RELEASE TO PICKUP
+          </button>
+          <button onClick={() => { finalAction(rx, "reject"); onClose(); }} style={{ ...TM, padding: "13px 0", background: "rgba(255,68,68,0.06)", color: "#FF4444", border: "1px solid rgba(255,68,68,0.35)", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+            ✕ REJECT — DO NOT DISPENSE
+          </button>
+        </div>
+      </ModalWrap>
+    );
+  };
+
   if (shiftReport) return <ShiftReport report={shiftReport} hourlyRate={hourlyRate} onContinue={continueShiftReport} />;
   if (auditOpen) return <SafeAudit onBalanced={finishAfterAudit} summary={pendingSummary} />;
 
@@ -5081,6 +5298,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
 
   return (
     <div>
+      {verifyModal && <ScriptModal vm={verifyModal} onClose={() => setVerifyModal(null)} />}
       {/* ── RXPRO SHIFT HEADER ── */}
       <div style={{ background: "#0B1F3A", borderRadius: "10px 10px 0 0", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div>
@@ -5177,8 +5395,8 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
                 <div style={{ ...TM, color: "#5A7080", fontSize: 10, marginTop: 3 }}>Qty {rx.qty} · {rx.sig}</div>
                 <PressureMeter rx={rx} />
-                <button onClick={() => approveData(rx)} style={{ ...TM, width: "100%", marginTop: 9, padding: "8px 0", background: "#3FB950", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
-                  ▶ VERIFY QV1
+                <button onClick={() => setVerifyModal({ rx, stage: "qv1" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "8px 0", background: "#0B1F3A", color: "#7EB8C9", border: "1px solid rgba(126,184,201,0.25)", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                  VIEW SCRIPT &amp; VERIFY ▶
                 </button>
               </div>
             </div>
@@ -5220,27 +5438,12 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                   <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 600 }}>{rx.patient}</span>
                   <span style={{ ...TM, color: needsReject ? "#FFB800" : "#7EB8C9", fontSize: 8, letterSpacing: 1 }}>{needsReject ? "⚠ CHECK" : "QV2"}</span>
                 </div>
-                <div style={{ padding: "8px 10px 4px" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                    <VialScatter p={f.pill} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
-                      <div style={{ ...TM, color: "#5A7080", fontSize: 9, marginTop: 2 }}>Imprint: {f.pill.imprint} · {f.pill.shape}</div>
-                    </div>
-                  </div>
-                <div style={{ ...TM, marginTop: 7, padding: "6px 8px", borderRadius: 6, background: needsReject ? "rgba(255,184,0,0.08)" : "#F7F9FB", fontSize: 10, color: needsReject ? "#FFB800" : "#5A7080", border: `1px solid ${needsReject ? "#FFB80044" : "#D0D8E0"}` }}>
-                  {f.stockDrug} {f.stockStrength} · Count {f.count} · Shape: {f.pill.shape}
-                </div>
-                <div style={{ ...TM, color: needsReject ? "#FFB800" : "#8A9AAA", fontSize: 9, marginTop: 5, letterSpacing: 0.5 }}>
-                  {needsReject ? "⚠ POSSIBLE ERROR — review before approving" : "Review stock, count, and label before clearing."}
-                </div>
-                <PressureMeter rx={rx} />
-                <div style={{ display: "flex", gap: 7, marginTop: 9 }}>
-                  <button onClick={() => finalAction(rx, "reject")} style={{ ...TM, flex: 1, padding: "8px 0", background: "rgba(178,58,36,0.08)", border: "1px solid rgba(178,58,36,0.4)", color: C.clay, borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer" }}>
-                    REJECT
-                  </button>
-                  <button onClick={() => finalAction(rx, "approve")} style={{ ...TM, flex: 1, padding: "8px 0", background: "#3FB950", border: "none", color: "#FFFFFF", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer" }}>
-                    APPROVE
+                <div style={{ padding: "8px 10px 10px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A2A35" }}>{rx.drug} {rx.strength}</div>
+                  <div style={{ ...TM, color: "#5A7080", fontSize: 10, marginTop: 2 }}>Qty: #{rx.qty} · {rx.lane?.toUpperCase()}</div>
+                  <PressureMeter rx={rx} />
+                  <button onClick={() => setVerifyModal({ rx, stage: "qv2" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: needsReject ? "rgba(255,184,0,0.1)" : "#0B1F3A", color: needsReject ? "#FFB800" : "#7EB8C9", border: `1px solid ${needsReject ? "#FFB80055" : "rgba(126,184,201,0.25)"}`, borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                    {needsReject ? "⚠ OPEN FINAL CHECK" : "OPEN FINAL CHECK ▶"}
                   </button>
                 </div>
               </div>
