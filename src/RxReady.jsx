@@ -6070,6 +6070,30 @@ function SpeedMode({ skills, level, onFinish, onQuit }) {
 /* ============================================================
    MODE 2 — FILL THE RX
    ============================================================ */
+function getDurAlert(c) {
+  const src = c.patient + " " + c.prescriber;
+  if (/penicillin|PCN\b/i.test(src))                         return { code: "AG-01", msg: "ALLERGY ALERT — PCN-FAMILY DRUG",          bg: "#5A0A0A", accent: "#FF6B6B" };
+  if (/lithium/i.test(src))                                   return { code: "DDI-03", msg: "DDI — LITHIUM TOXICITY RISK",              bg: "#3A1A00", accent: "#FF9A3C" };
+  if (/warfarin/i.test(src))                                  return { code: "DDI-07", msg: "DDI — ANTICOAGULANT POTENTIATION",         bg: "#3A1A00", accent: "#FF9A3C" };
+  if (/digoxin/i.test(src))                                   return { code: "NTI-02", msg: "DDI — NTI DRUG INTERACTION",               bg: "#3A1A00", accent: "#FF9A3C" };
+  if (/sumatriptan|venlafaxine/i.test(src))                   return { code: "DDI-12", msg: "DDI — SEROTONIN SYNDROME RISK",            bg: "#3A1A00", accent: "#FF9A3C" };
+  if (/st\.?\s*john|st john/i.test(src))                      return { code: "DDI-12", msg: "DDI — SEROTONIN SYNDROME RISK",            bg: "#3A1A00", accent: "#FF9A3C" };
+  if (/spironolactone|potassium.*chloride|KCl\b/i.test(src)) return { code: "DDI-09", msg: "DDI — HYPERKALEMIA RISK",                  bg: "#3A1A00", accent: "#FF9A3C" };
+  if (/Humulin|regular insulin/i.test(src))                  return { code: "HA-04", msg: "HIGH ALERT — INSULIN LASA RISK",            bg: "#3A0040", accent: "#E070FF" };
+  return null;
+}
+
+function getDrugBadge(drug) {
+  if (/tramadol/i.test(drug))                                           return { label: "C-IV",       color: "#FF8C42", bg: "#3A1800" };
+  if (/oxycodone|hydrocodone|fentanyl|morphine|opioid/i.test(drug))    return { label: "C-II",       color: "#FF4444", bg: "#3A0000" };
+  if (/phenytoin/i.test(drug))                                          return { label: "NTI",        color: "#FFD166", bg: "#2A2200" };
+  if (/digoxin/i.test(drug))                                            return { label: "NTI",        color: "#FFD166", bg: "#2A2200" };
+  if (/warfarin/i.test(drug))                                           return { label: "ANTICOAG",   color: "#FF9A3C", bg: "#2A1400" };
+  if (/insulin/i.test(drug))                                            return { label: "HIGH ALERT", color: "#E070FF", bg: "#28003A" };
+  if (/lithium/i.test(drug))                                            return { label: "NTI",        color: "#FFD166", bg: "#2A2200" };
+  return null;
+}
+
 function FillMode({ level, onFinish, onQuit }) {
   const [cases] = useState(() => shuffle(RXCASES.filter((c) => c.level <= level)).slice(0, 5));
   const [ci, setCi] = useState(0);
@@ -6081,6 +6105,7 @@ function FillMode({ level, onFinish, onQuit }) {
   const [shift] = useState(() => SHIFT_CONTEXTS[Math.floor(Math.random() * SHIFT_CONTEXTS.length)]);
   const [rxNums] = useState(() => Array.from({ length: 20 }, () => Math.floor(1000000 + Math.random() * 8999999)));
   const [showNpc, setShowNpc] = useState(false);
+  const [durDismissed, setDurDismissed] = useState(false);
 
   const c = cases[ci];
   if (!c) return <Empty onQuit={onQuit} />;
@@ -6088,6 +6113,9 @@ function FillMode({ level, onFinish, onQuit }) {
   const totalSteps = cases.reduce((n, x) => n + x.steps.length, 0);
   const doneSteps = cases.slice(0, ci).reduce((n, x) => n + x.steps.length, 0) + si;
   const queueNow = shift.queue - ci;
+  const dur = getDurAlert(c);
+  const badge = getDrugBadge(c.drug);
+  const caseVerified = locked && si + 1 >= c.steps.length;
 
   function answer(i) {
     if (locked) return;
@@ -6097,7 +6125,7 @@ function FillMode({ level, onFinish, onQuit }) {
   function next() {
     if (si + 1 < c.steps.length) { setSi(si + 1); setSelected(null); setLocked(false); return; }
     if (ci + 1 < cases.length) {
-      setCi(ci + 1); setSi(0); setSelected(null); setLocked(false);
+      setCi(ci + 1); setSi(0); setSelected(null); setLocked(false); setDurDismissed(false);
       if (shift.mood === "slammed" && Math.random() > 0.4) setShowNpc(true);
       return;
     }
@@ -6142,8 +6170,25 @@ function FillMode({ level, onFinish, onQuit }) {
       </div>
       <ProgressBar value={(doneSteps / totalSteps) * 100} />
 
+      {/* DUR Alert banner */}
+      {dur && !durDismissed && (
+        <div className="pop" style={{
+          background: dur.bg, borderRadius: 10, marginTop: 14,
+          padding: "9px 14px", display: "flex", alignItems: "center", gap: 10,
+          border: `1.5px solid ${dur.accent}`,
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>⚠</span>
+          <div style={{ flex: 1, fontFamily: "'Spline Sans Mono', monospace" }}>
+            <span style={{ color: dur.accent, fontWeight: 700, fontSize: 11, letterSpacing: 0.8 }}>[{dur.code}] </span>
+            <span style={{ color: "#FFE8C0", fontSize: 11, fontWeight: 600 }}>{dur.msg}</span>
+            <div style={{ color: "rgba(255,232,192,0.6)", fontSize: 10, marginTop: 2 }}>Pharmacist review required before dispensing</div>
+          </div>
+          <button onClick={() => setDurDismissed(true)} style={{ background: "none", border: `1px solid ${dur.accent}`, color: dur.accent, cursor: "pointer", fontSize: 10, padding: "3px 8px", borderRadius: 5, fontFamily: "monospace" }}>ACK</button>
+        </div>
+      )}
+
       {/* Pharmacy terminal card */}
-      <div style={{ borderRadius: 13, overflow: "hidden", marginTop: 14, border: "1.5px solid #0B1F3A", boxShadow: "0 4px 18px rgba(11,31,58,0.15)" }}>
+      <div style={{ borderRadius: 13, overflow: "hidden", marginTop: 10, border: `1.5px solid ${dur && !durDismissed ? dur.accent : "#0B1F3A"}`, boxShadow: "0 4px 18px rgba(11,31,58,0.15)", transition: "border-color .3s" }}>
         {/* Terminal header */}
         <div style={{
           background: "#0B1F3A", padding: "8px 14px",
@@ -6151,7 +6196,12 @@ function FillMode({ level, onFinish, onQuit }) {
           fontFamily: "'Spline Sans Mono', monospace", fontSize: 10.5,
         }}>
           <span style={{ color: "#7EB8C9", fontWeight: 700, letterSpacing: 0.5 }}>RxPRO DISPENSING</span>
-          <span style={{ color: "rgba(126,184,201,0.55)", textAlign: "center" }}>STATION 1</span>
+          <div style={{ textAlign: "center", display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+            <span style={{ color: "rgba(126,184,201,0.55)" }}>STATION 1</span>
+            {badge && (
+              <span style={{ background: badge.bg, color: badge.color, fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4, letterSpacing: 0.5, border: `1px solid ${badge.color}40` }}>{badge.label}</span>
+            )}
+          </div>
           <span style={{ color: "#7EB8C9", textAlign: "right", opacity: 0.75 }}>RX# {rxNums[ci]}</span>
         </div>
         {/* Label body */}
@@ -6175,13 +6225,15 @@ function FillMode({ level, onFinish, onQuit }) {
             </span>
           </div>
         </div>
-        {/* Footer status bar */}
+        {/* Footer status bar — live */}
         <div style={{
-          background: "#0d2a1e", padding: "5px 14px",
+          background: caseVerified ? "#0a2e14" : "#0d2a1e", padding: "5px 14px",
           display: "flex", justifyContent: "space-between",
-          fontFamily: "'Spline Sans Mono', monospace", fontSize: 10, color: "rgba(126,201,160,0.7)",
+          fontFamily: "'Spline Sans Mono', monospace", fontSize: 10,
+          color: caseVerified ? "#5AE87A" : "rgba(126,201,160,0.7)",
+          transition: "background .4s, color .4s",
         }}>
-          <span>STATUS: PENDING VERIFICATION</span>
+          <span>{caseVerified ? "STATUS: VERIFIED ✓ — LABEL QUEUED FOR PRINT" : dur && !durDismissed ? "STATUS: DUR HOLD — REVIEW REQUIRED" : "STATUS: PENDING VERIFICATION"}</span>
           <span>STEP {si + 1}/{c.steps.length}</span>
         </div>
       </div>
