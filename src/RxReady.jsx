@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { loadSave, recordShiftResult, recordDrillResult, recordActivity, getRank, getStatLevel } from './afterhours/save.js';
+import { loadSave, recordShiftResult, recordDrillResult, recordActivity, earnAchievement, recordStars, getRank, getStatLevel } from './afterhours/save.js';
 import { getQuip, NARRATOR_NAME, ZIPPO_GRID, ZIPPO_COLORS } from './afterhours/narrator.js';
 import AfterHours from './afterhours/AfterHours.jsx';
 import AgeGate from './afterhours/AgeGate.jsx';
@@ -147,6 +147,56 @@ const MODES = [
     icon: "$",
   },
 ];
+
+const ACHIEVEMENTS = [
+  { id: "first_clock_in",  icon: "🏥", title: "Punched In",          desc: "Completed your first shift",                          rarity: "common"   },
+  { id: "eagle_eye",       icon: "👁", title: "Eagle Eye",            desc: "Caught your first QV1 data entry error",               rarity: "uncommon" },
+  { id: "eagle_streak",    icon: "⚡", title: "Error Hunter",         desc: "Caught 3 QV1 errors in one shift",                     rarity: "rare"     },
+  { id: "perfect_qv2",     icon: "✓", title: "Zero Defects",         desc: "100% accuracy on QV2 Final Check",                     rarity: "uncommon" },
+  { id: "speed_demon",     icon: "⏱", title: "Speed Demon",          desc: "Hit a 10-combo in Speed Drill",                        rarity: "uncommon" },
+  { id: "drug_master",     icon: "✚", title: "Drug Master",          desc: "100% on Product Knowledge",                            rarity: "uncommon" },
+  { id: "reject_ace",      icon: "▤", title: "Claims Expert",        desc: "90%+ on Reject Codes",                                 rarity: "uncommon" },
+  { id: "dur_zero",        icon: "⊕", title: "Zero DUR Misses",      desc: "Perfect on DUR Screen",                                rarity: "uncommon" },
+  { id: "patient_champ",   icon: "☺", title: "Patient Advocate",     desc: "100% on Pickup Counter",                               rarity: "uncommon" },
+  { id: "week_warrior",    icon: "🔥", title: "Week Warrior",         desc: "7-day training streak",                                rarity: "rare"     },
+  { id: "promoted",        icon: "$", title: "Not an Intern Anymore", desc: "Advanced past Intern rank",                           rarity: "rare"     },
+  { id: "the_grind",       icon: "℞", title: "The Grind",            desc: "Completed 25 drills total",                            rarity: "epic"     },
+  { id: "triple_star",     icon: "★", title: "Three-Star Pharmacist", desc: "Earned ⭐⭐⭐ on any station",                         rarity: "uncommon" },
+  { id: "all_stations",    icon: "▶", title: "All Stations Active",  desc: "Played every training station at least once",           rarity: "rare"     },
+];
+
+const RARITY_COLOR = { common: "#7EB8C9", uncommon: "#3FB950", rare: "#FFB800", epic: "#CC0000" };
+
+const DAILY_MISSION_POOL = [
+  { id: "dm_speed_90",   mode: 1,  title: "Sharp Mind",        desc: "Score 90%+ on Speed Drill",              target: 90,  targetType: "pct"   },
+  { id: "dm_drug_100",   mode: 4,  title: "Drug Card Master",  desc: "Score 100% on Product Knowledge",         target: 100, targetType: "pct"   },
+  { id: "dm_reject_90",  mode: 7,  title: "Billing Expert",    desc: "Score 90%+ on Reject Codes",              target: 90,  targetType: "pct"   },
+  { id: "dm_dur_clean",  mode: 5,  title: "DUR Zero",          desc: "Zero misses on DUR Screen",               target: 100, targetType: "pct"   },
+  { id: "dm_pickup_100", mode: 3,  title: "Patient First",     desc: "Perfect score on Pickup Counter",         target: 100, targetType: "pct"   },
+  { id: "dm_qv2_clean",  mode: 12, title: "Clean Bench",       desc: "100% accuracy on QV2 Final Check",        target: 100, targetType: "pct"   },
+  { id: "dm_entry_85",   mode: 11, title: "Speed Entry",       desc: "Score 85%+ on Type the Script",           target: 85,  targetType: "pct"   },
+  { id: "dm_law_80",     mode: 8,  title: "Law Review",        desc: "Score 80%+ on VA Board Rules",            target: 80,  targetType: "pct"   },
+  { id: "dm_label_90",   mode: 6,  title: "Label Pro",         desc: "Score 90%+ on Build the Label",           target: 90,  targetType: "pct"   },
+  { id: "dm_qv1_run",    mode: 13, title: "Run the Queue",     desc: "Complete a full shift in Run the Queue",  target: 1,   targetType: "play"  },
+  { id: "dm_counter_a",  mode: 3,  title: "Front Counter",     desc: "Score an A on Pickup Counter",            target: 90,  targetType: "pct"   },
+  { id: "dm_verify_qv1", mode: 10, title: "QV1 Check",         desc: "Complete QV1 — Check Entry",              target: 80,  targetType: "pct"   },
+];
+
+function getDailyMissions() {
+  const seed = new Date().toDateString().split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const sorted = [...DAILY_MISSION_POOL].sort((a, b) => {
+    const ah = (seed * 31 + a.id.charCodeAt(3)) % 97;
+    const bh = (seed * 31 + b.id.charCodeAt(3)) % 97;
+    return bh - ah;
+  });
+  // Pick 3 with different modes
+  const picked = []; const usedModes = new Set();
+  for (const m of sorted) {
+    if (!usedModes.has(m.mode)) { picked.push(m); usedModes.add(m.mode); }
+    if (picked.length === 3) break;
+  }
+  return picked;
+}
 
 const SHIFT_CONTEXTS = [
   { time: "MON 9:12 AM", mood: "steady",       queue: 11, banner: "Monday morning · 11 scripts in queue · Printer jammed twice already",              npc: "Hey, tech just called out sick. It's just us today." },
@@ -5887,7 +5937,37 @@ export default function App() {
   const [splash, setSplash] = useState(true);
   const [splashLeaving, setSplashLeaving] = useState(false);
   const [rankToast, setRankToast] = useState(null);
+  const [achievementToast, setAchievementToast] = useState(null);
+  const [achievementLeaving, setAchievementLeaving] = useState(false);
+  const achievementQueueRef = useRef([]);
   const prevRankRef = useRef(null);
+
+  function showNextAchievement() {
+    const q = achievementQueueRef.current;
+    if (!q.length) return;
+    const next = q[0];
+    setAchievementLeaving(false);
+    setAchievementToast(next);
+    setTimeout(() => {
+      setAchievementLeaving(true);
+      setTimeout(() => {
+        achievementQueueRef.current = achievementQueueRef.current.slice(1);
+        setAchievementToast(null);
+        setAchievementLeaving(false);
+        if (achievementQueueRef.current.length) showNextAchievement();
+      }, 380);
+    }, 3000);
+  }
+
+  function triggerAchievement(id, currentSave, currentSetSave) {
+    const def = ACHIEVEMENTS.find(a => a.id === id);
+    if (!def) return currentSave;
+    if (currentSave.achievements?.some(a => a.id === id)) return currentSave;
+    const next = earnAchievement(id, currentSave, currentSetSave);
+    achievementQueueRef.current = [...achievementQueueRef.current, def];
+    if (!achievementToast) showNextAchievement();
+    return next;
+  }
 
   useEffect(() => {
     const t1 = setTimeout(() => setSplashLeaving(true), 1400);
@@ -5911,8 +5991,33 @@ export default function App() {
   const finish = (res) => {
     setResult(res); setScreen("result");
     const modeTag = mode === 8 ? 'law' : mode === 7 ? 'insurance' : mode === 3 ? 'counter' : mode === 2 ? 'fill' : 'general';
-    recordDrillResult({ correct: res.correct || 0, total: res.total || 0, modeTag, save, setSave });
-    recordActivity(mode, save, setSave);
+    let s = recordDrillResult({ correct: res.correct || 0, total: res.total || 0, modeTag, save, setSave });
+    s = recordActivity(mode, s, setSave);
+
+    const pct = res.total ? Math.round(((res.correct || 0) / res.total) * 100) : 0;
+    const stars = pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 50 ? 1 : 0;
+    const prevStars = s.stars?.[mode] || 0;
+    if (stars > prevStars) s = recordStars(mode, stars, s, setSave);
+
+    // Achievement checks
+    const totalDrills = Object.keys(s.lastPlayed || {}).length;
+    if (totalDrills >= 1 && !s.achievements?.some(a => a.id === "first_clock_in"))
+      s = triggerAchievement("first_clock_in", s, setSave);
+    if (stars === 3 && prevStars < 3)
+      s = triggerAchievement("triple_star", s, setSave);
+    if (pct === 100 && mode === 4)  s = triggerAchievement("drug_master",   s, setSave);
+    if (pct >= 90  && mode === 7)   s = triggerAchievement("reject_ace",    s, setSave);
+    if (pct === 100 && mode === 5)  s = triggerAchievement("dur_zero",      s, setSave);
+    if (pct === 100 && mode === 3)  s = triggerAchievement("patient_champ", s, setSave);
+    if (pct === 100 && mode === 12) s = triggerAchievement("perfect_qv2",   s, setSave);
+    if (res.bestStreak >= 10)       s = triggerAchievement("speed_demon",   s, setSave);
+    if ((s.shifts || 0) + totalDrills >= 25) s = triggerAchievement("the_grind", s, setSave);
+    const playedModes = new Set(Object.keys(s.lastPlayed || {}).map(Number));
+    if (MODES.every(m => playedModes.has(m.id))) s = triggerAchievement("all_stations", s, setSave);
+    const prevRank = getRank((s.lifetimeEarned || 0) - (res.correct || 0) * 3);
+    if (prevRank === "Intern" && getRank(s.lifetimeEarned) !== "Intern")
+      s = triggerAchievement("promoted", s, setSave);
+    if ((s.dailyStreak || 0) >= 7) s = triggerAchievement("week_warrior", s, setSave);
   };
   const home = () => { setScreen("home"); setMode(null); setResult(null); };
 
@@ -5934,6 +6039,10 @@ export default function App() {
         @keyframes rise { from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
         .pop { animation: pop .28s cubic-bezier(.2,.8,.2,1) both; }
         @keyframes pop { from{opacity:0; transform:scale(.96)} to{opacity:1; transform:scale(1)} }
+        .achievement-slide { animation: aslide .45s cubic-bezier(.15,.8,.2,1) both; }
+        @keyframes aslide { from{opacity:0;transform:translateY(80px) scale(.94)} to{opacity:1;transform:none} }
+        .achievement-out { animation: aout .35s cubic-bezier(.4,0,1,1) both; }
+        @keyframes aout { from{opacity:1;transform:none} to{opacity:0;transform:translateY(60px)} }
         .opt:hover:not(:disabled){ transform: translateY(-2px); }
         .opt { transition: transform .12s ease, border-color .12s ease, background .12s ease; }
         .lift { transition: transform .15s ease, box-shadow .15s ease; }
@@ -5989,13 +6098,39 @@ export default function App() {
       {splash && <SplashScreen leaving={splashLeaving} />}
       {rankToast && (
         <div className="rank-toast" style={{
-          position: 'fixed', top: 24, left: '50%',
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
           background: C.amber, color: C.paper, borderRadius: 22, padding: '11px 24px',
           zIndex: 500, textAlign: 'center', boxShadow: `0 10px 28px rgba(192,120,30,0.55)`,
           pointerEvents: 'none', whiteSpace: 'nowrap',
         }}>
           <div className="pixel" style={{ fontSize: 7, marginBottom: 5, opacity: 0.85 }}>RANK UP</div>
           <div className="display" style={{ fontSize: 18, fontWeight: 900 }}>{rankToast}</div>
+        </div>
+      )}
+
+      {achievementToast && (
+        <div className={achievementLeaving ? "achievement-out" : "achievement-slide"} style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 600, width: 'min(360px, calc(100vw - 32px))', pointerEvents: 'none',
+        }}>
+          <div style={{
+            background: "#0B1F3A", borderRadius: 14, overflow: 'hidden',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.6)', border: `2px solid ${RARITY_COLOR[achievementToast.rarity] || "#FFB800"}`,
+          }}>
+            <div style={{ background: "#CC0000", padding: "6px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: "rgba(255,255,255,0.8)", fontSize: 8, letterSpacing: 2 }}>ACHIEVEMENT UNLOCKED</span>
+              <span style={{ fontFamily: "'Spline Sans Mono',monospace", color: RARITY_COLOR[achievementToast.rarity], fontSize: 7, letterSpacing: 1, textTransform: "uppercase" }}>{achievementToast.rarity}</span>
+            </div>
+            <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ fontSize: 32, width: 48, height: 48, display: "grid", placeItems: "center", background: "rgba(255,255,255,0.06)", borderRadius: 10, flexShrink: 0, border: `1px solid ${RARITY_COLOR[achievementToast.rarity]}44` }}>
+                {achievementToast.icon}
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Fraunces',serif", fontSize: 18, fontWeight: 900, color: "#FFFFFF", lineHeight: 1.1 }}>{achievementToast.title}</div>
+                <div style={{ fontFamily: "'Spline Sans Mono',monospace", fontSize: 10, color: "rgba(255,255,255,0.6)", marginTop: 4, lineHeight: 1.4 }}>{achievementToast.desc}</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -6186,10 +6321,18 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
     const m = modeById(id);
     const done = wasPlayedToday(id, save);
     const days = daysSinceMode(id, save);
+    const starCount = save?.stars?.[id] || 0;
     return (
-      <button onClick={() => onPick(id)} style={{ textAlign: "center", background: done ? "rgba(63,185,80,0.07)" : "#FFFFFF", border: `1px solid ${done ? "rgba(63,185,80,0.3)" : "#D0D8E0"}`, borderRadius: 9, padding: "10px 4px 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minHeight: 68 }}>
+      <button onClick={() => onPick(id)} style={{ textAlign: "center", background: done ? "rgba(63,185,80,0.07)" : "#FFFFFF", border: `1px solid ${done ? "rgba(63,185,80,0.3)" : "#D0D8E0"}`, borderRadius: 9, padding: "10px 4px 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minHeight: 72 }}>
         <span style={{ fontSize: 18, fontFamily: "'Fraunces',serif", lineHeight: 1, color: done ? "#3FB950" : "inherit" }}>{done ? "✓" : m.icon}</span>
         <span style={{ ...TM, fontSize: 9, fontWeight: 600, color: done ? "#3FB950" : "#0B1F3A", lineHeight: 1.25, textAlign: "center" }}>{m.title}</span>
+        {starCount > 0 ? (
+          <div style={{ display: "flex", gap: 1 }}>
+            {[1,2,3].map(i => (
+              <span key={i} style={{ fontSize: 9, color: i <= starCount ? "#FFB800" : "#D0D8E0", lineHeight: 1 }}>★</span>
+            ))}
+          </div>
+        ) : <div style={{ height: 11 }} />}
         <span style={{ ...TM, fontSize: 7, color: "#8A9AAA", background: "#F2F5F7", borderRadius: 3, padding: "1px 5px" }}>
           {days < 0 ? "new" : days === 0 ? "today" : `${days}d ago`} · ~{MODE_TIME_EST[id] || 10}m
         </span>
@@ -6300,6 +6443,43 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
           );
         })}
       </div>
+
+      {/* ── DAILY MISSIONS ── */}
+      {(() => {
+        const missions = getDailyMissions();
+        const completed = missions.filter(dm => wasPlayedToday(dm.mode, save)).length;
+        return (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ ...TM, color: "#CC0000", fontSize: 8, letterSpacing: 2.5 }}>▸ DAILY MISSIONS</span>
+              <span style={{ ...TM, fontSize: 9, color: completed === 3 ? "#3FB950" : "#FFB800" }}>
+                {completed === 3 ? "✓ ALL COMPLETE" : `${completed}/3 done`}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {missions.map((dm) => {
+                const m = modeById(dm.mode);
+                const done = wasPlayedToday(dm.mode, save);
+                return (
+                  <button key={dm.id} onClick={() => onPick(dm.mode)}
+                    style={{ width: "100%", textAlign: "left", background: done ? "rgba(63,185,80,0.05)" : "rgba(204,0,0,0.03)", border: `1px solid ${done ? "rgba(63,185,80,0.25)" : "rgba(204,0,0,0.15)"}`, borderRadius: 9, padding: "9px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: done ? "#143520" : "#1A0000", color: done ? "#3FB950" : "#CC0000", display: "grid", placeItems: "center", fontFamily: "'Fraunces',serif", fontSize: 14, flexShrink: 0 }}>
+                      {done ? "✓" : m?.icon}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ ...TM, fontSize: 10, fontWeight: 700, color: done ? "#3FB950" : "#CC0000", lineHeight: 1.2 }}>{dm.title}</div>
+                      <div style={{ ...TM, fontSize: 8, color: done ? "#3FB950" : "#7A8A9A", marginTop: 2 }}>{dm.desc}</div>
+                    </div>
+                    <div style={{ ...TM, fontSize: 8, color: done ? "#3FB950" : "#CC0000", background: done ? "rgba(63,185,80,0.1)" : "rgba(204,0,0,0.08)", borderRadius: 4, padding: "3px 7px", flexShrink: 0, fontWeight: 700 }}>
+                      {done ? "DONE" : `≥${dm.target}%`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── CLOCK IN HERO ── */}
       <button onClick={() => onPick(14)} className="lift"
@@ -7031,110 +7211,132 @@ function Empty({ onQuit }) {
 /* ============================================================
    RESULTS
    ============================================================ */
+const CVS_COACHING = {
+  1:  { tip: "Speed Drill: Focus on sig codes and drug interactions — those two categories make up ~60% of the questions.", focus: "Speed & Recall" },
+  2:  { tip: "Count & Fill: Double-check the NDC number against the label before counting. One wrong bottle = a QV2 reject.", focus: "Accuracy" },
+  3:  { tip: "Pickup Counter: Lead with empathy. 'Let me check on that for you' disarms most hostile patients before they escalate.", focus: "Patient Service" },
+  4:  { tip: "Product Knowledge: Know the top 200 brand-generic pairs cold — your RxConnect queue will thank you.", focus: "Drug Knowledge" },
+  5:  { tip: "DUR Screen: Never clear a major interaction without documenting the clinical rationale. Liability starts here.", focus: "Clinical Safety" },
+  6:  { tip: "Build the Label: If the directions aren't clear to a non-medical person, rewrite them. Clarity prevents callbacks.", focus: "Label Accuracy" },
+  7:  { tip: "Reject Codes: Refill-too-soon and PA required are your two most common rejects. Know the workaround for each cold.", focus: "Billing" },
+  8:  { tip: "VA Board Rules: Schedule II rules trip up every pharmacist. Emergency dispensing limits and CII refill rules are tested every exam.", focus: "Law & Compliance" },
+  9:  { tip: "Floor Shift: Triage ruthlessly — waiters before drive-thru, drive-thru before will-call. Don't let the phones stall QV1.", focus: "Workflow" },
+  10: { tip: "QV1: The error is almost never the drug itself — check strength, quantity, and sig first. 80% of catches are there.", focus: "Verification" },
+  11: { tip: "Type the Script: Days supply errors are the #1 reject. Always calculate: qty ÷ (doses × times per day).", focus: "Data Entry" },
+  12: { tip: "QV2: Hold the bottle next to the label. NDC, strength, qty, and form — in that order, every time.", focus: "Final Check" },
+  13: { tip: "Run the Queue: A QV1 backlog kills your promise time metric. Verify before you fill — not after.", focus: "Queue Management" },
+  14: { tip: "Career Mode: Your daily metrics (fill accuracy, drive-thru wait, patient satisfaction) determine your performance tier.", focus: "Career" },
+};
+
 function Result({ result, onAgain, onHome }) {
-  let grade = "—", line = "", color = C.pine, stats = [];
+  const TM = { fontFamily: "'Spline Sans Mono',monospace" };
+  let pct = 0, grade = "—", tier = "", tierColor = "", tierBg = "", stats = [], storeNum = Math.floor(Math.random() * 8000 + 1000);
+  let starCount = 0;
+
+  const getPct = () => result.total ? Math.round((result.correct / result.total) * 100) : 0;
 
   if (result.mode === 1) {
-    const pct = result.total ? Math.round((result.correct / result.total) * 100) : 0;
+    pct = getPct();
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
-    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
-    line = result.outOfLives
-      ? "You ran out of lives — review the misses and run it back."
-      : pct >= 80 ? "Sharp recall under pressure. You're bench-ready on these." : "Solid start — speed comes with reps.";
-    stats = [
-      { label: "Score", value: result.score },
-      { label: "Accuracy", value: pct + "%" },
-      { label: "Best streak", value: "×" + result.bestStreak },
-    ];
+    stats = [{ label: "Score", value: result.score }, { label: "Accuracy", value: pct + "%" }, { label: "Best Streak", value: "×" + result.bestStreak }];
   } else if (result.mode === 2) {
-    const pct = result.total ? Math.round((result.correct / result.total) * 100) : 0;
+    pct = getPct();
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
-    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
-    line = pct >= 80 ? "Clean fills — sig, math, and safety checks all on point." : "Re-run the cases; the calculations get faster every time.";
-    stats = [
-      { label: "Rx filled", value: result.rxFilled },
-      { label: "Steps right", value: `${result.correct}/${result.total}` },
-      { label: "Accuracy", value: pct + "%" },
-    ];
+    stats = [{ label: "Rx Filled", value: result.rxFilled }, { label: "Steps Right", value: `${result.correct}/${result.total}` }, { label: "Accuracy", value: pct + "%" }];
   } else if (result.mode === 5) {
-    const pct = result.total ? Math.round((result.correct / result.total) * 100) : 0;
+    pct = getPct();
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
-    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
-    line = pct >= 80
-      ? "Strong verification instincts — you caught the alerts and made the right calls."
-      : "Review the misses — the safest pharmacist catches the alert before it reaches the patient.";
-    stats = [
-      { label: "Rx reviewed", value: result.reviewed },
-      { label: "Correct calls", value: `${result.correct}/${result.total}` },
-      { label: "Accuracy", value: pct + "%" },
-    ];
+    stats = [{ label: "Rx Reviewed", value: result.reviewed }, { label: "Correct Calls", value: `${result.correct}/${result.total}` }, { label: "Accuracy", value: pct + "%" }];
   } else if (result.mode === 6) {
-    const pct = result.total ? Math.round((result.correct / result.total) * 100) : 0;
+    pct = getPct();
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
-    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
-    line = pct >= 80
-      ? "Clear, complete directions — that's a label a patient can actually follow."
-      : "Review the misses — every element of the sig has to be right for the directions to be safe.";
-    stats = [
-      { label: "Scripts", value: result.scripts },
-      { label: "Clean", value: `${result.correct}/${result.total}` },
-      { label: "Accuracy", value: pct + "%" },
-    ];
+    stats = [{ label: "Scripts", value: result.scripts }, { label: "Clean Labels", value: `${result.correct}/${result.total}` }, { label: "Accuracy", value: pct + "%" }];
   } else if (result.mode === 7) {
-    const pct = result.total ? Math.round((result.correct / result.total) * 100) : 0;
+    pct = getPct();
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
-    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
-    line = pct >= 80
-      ? "You read the codes and got the patient's meds moving — that's the front-counter win."
-      : "Review the misses — knowing what each reject code means turns a frustrated patient into a solved problem.";
-    stats = [
-      { label: "Claims worked", value: result.resolved },
-      { label: "Correct calls", value: `${result.correct}/${result.total}` },
-      { label: "Accuracy", value: pct + "%" },
-    ];
+    stats = [{ label: "Claims Worked", value: result.resolved }, { label: "Correct Calls", value: `${result.correct}/${result.total}` }, { label: "Accuracy", value: pct + "%" }];
   } else if (result.mode === 13) {
-    const pct = result.completed ? Math.round((result.correct / result.completed) * 100) : 0;
+    pct = result.completed ? Math.round((result.correct / result.completed) * 100) : 0;
     grade = pct >= 90 ? "A" : pct >= 80 ? "B" : pct >= 70 ? "C" : pct >= 60 ? "D" : "F";
-    color = pct >= 80 ? C.green : pct >= 60 ? C.amber : C.clay;
-    line = pct >= 80
-      ? "Manager loop handled: data verified, production moved, final checks cleared, and the CII safe balanced."
-      : "Run the manager loop again and slow down at final check.";
     stats = [
-      { label: "Final checks", value: result.completed },
+      { label: "Final Checks", value: result.completed },
       { label: "Net", value: result.netProfit !== undefined ? money(result.netProfit) : `${result.correct}/${result.completed}` },
       { label: "Penalties", value: result.totalPenalties !== undefined ? money(result.totalPenalties) : result.auditAttempts || 1 },
     ];
   } else {
-    const r = result.rating;
+    const r = result.rating || 0;
+    pct = r;
     grade = r >= 85 ? "A" : r >= 70 ? "B" : r >= 55 ? "C" : r >= 40 ? "D" : "F";
-    color = r >= 70 ? C.green : r >= 45 ? C.amber : C.clay;
-    line = r >= 80 ? "Safe, lawful, and patient-centered. That's the job." : "Watch the risky picks — safety and the law come before speed.";
-    stats = [
-      { label: "Shift rating", value: r },
-      { label: "Best calls", value: result.counts.best },
-      { label: "Risky calls", value: result.counts.bad },
-    ];
+    stats = [{ label: "Shift Rating", value: r }, { label: "Best Calls", value: result.counts?.best ?? "—" }, { label: "Risky Calls", value: result.counts?.bad ?? "—" }];
   }
 
-  return (
-    <div className="rise" style={{ textAlign: "center", paddingTop: 8 }}>
-      <div className="grade-ring" style={{
-        width: 122, height: 122, borderRadius: "50%", margin: "0 auto 16px",
-        background: C.card, border: `4px solid ${color}`, display: "grid", placeItems: "center",
-        boxShadow: `0 20px 52px -16px ${color}cc`,
-      }}>
-        <span className="display grade-pop" style={{ fontSize: 56, fontWeight: 900, color, lineHeight: 1 }}>{grade}</span>
-      </div>
-      <h2 className="display" style={{ fontSize: 26, fontWeight: 900, margin: "0 0 6px" }}>Shift complete</h2>
-      <p style={{ color: C.muted, fontSize: 15.5, maxWidth: 460, margin: "0 auto 22px", lineHeight: 1.5 }}>{line}</p>
+  starCount = pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 50 ? 1 : 0;
 
-      <div className="rx-card" style={{ padding: 20, display: "flex", justifyContent: "space-around", marginBottom: 22 }}>
-        {stats.map((s) => <Stat key={s.label} {...s} color={color} />)}
+  if (pct >= 90)      { tier = "EXCEEDS EXPECTATIONS"; tierColor = "#3FB950"; tierBg = "rgba(63,185,80,0.1)"; }
+  else if (pct >= 75) { tier = "MEETS EXPECTATIONS";   tierColor = "#7EB8C9"; tierBg = "rgba(126,184,201,0.1)"; }
+  else if (pct >= 55) { tier = "NEEDS IMPROVEMENT";    tierColor = "#FFB800"; tierBg = "rgba(255,184,0,0.1)"; }
+  else                { tier = "PERFORMANCE ACTION REQUIRED"; tierColor = "#FF4444"; tierBg = "rgba(255,68,68,0.1)"; }
+
+  const gradeColor = grade === "A" ? "#3FB950" : grade === "B" ? "#7EB8C9" : grade === "C" ? "#FFB800" : "#FF4444";
+  const coaching = CVS_COACHING[result.mode] || { tip: "Practice makes permanent. Run it again.", focus: "General" };
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return (
+    <div className="rise" style={{ paddingTop: 0 }}>
+      {/* CVS Performance Review Header */}
+      <div style={{ background: "#CC0000", borderRadius: "14px 14px 0 0", padding: "10px 16px 12px", marginBottom: 0 }}>
+        <div style={{ ...TM, color: "rgba(255,255,255,0.65)", fontSize: 7, letterSpacing: 2.5, marginBottom: 4 }}>CVS PHARMACY · PERFORMANCE REVIEW · STORE #{storeNum}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <div style={{ ...TM, color: "#FFFFFF", fontSize: 12, fontWeight: 700 }}>{modeById(result.mode)?.title || "Training Session"}</div>
+          <div style={{ ...TM, color: "rgba(255,255,255,0.7)", fontSize: 8 }}>{dateStr} {timeStr}</div>
+        </div>
+      </div>
+
+      {/* Grade + Stars + Tier */}
+      <div style={{ background: "#0B1F3A", padding: "18px 16px 14px", marginBottom: 0, display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ width: 72, height: 72, borderRadius: 14, background: "rgba(0,0,0,0.35)", border: `3px solid ${gradeColor}`, display: "grid", placeItems: "center", flexShrink: 0, boxShadow: `0 8px 24px -8px ${gradeColor}88` }}>
+          <span style={{ fontFamily: "'Fraunces',serif", fontSize: 44, fontWeight: 900, color: gradeColor, lineHeight: 1 }}>{grade}</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 3, marginBottom: 6 }}>
+            {[1,2,3].map(i => (
+              <span key={i} style={{ fontSize: 22, color: i <= starCount ? "#FFB800" : "rgba(255,255,255,0.15)", lineHeight: 1 }}>★</span>
+            ))}
+          </div>
+          <div style={{ ...TM, fontSize: 9, fontWeight: 700, color: tierColor, letterSpacing: 1.5, background: tierBg, borderRadius: 5, padding: "4px 8px", display: "inline-block" }}>
+            {tier}
+          </div>
+          <div style={{ ...TM, fontSize: 9, color: "#4A8FA5", marginTop: 5 }}>
+            {coaching.focus} · {pct}% accuracy
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ background: "#0F2A3F", padding: "10px 16px", borderTop: "1px solid rgba(0,0,0,0.3)", marginBottom: 0, display: "flex", justifyContent: "space-around" }}>
+        {stats.map((s) => (
+          <div key={s.label} style={{ textAlign: "center" }}>
+            <div style={{ ...TM, fontSize: 18, fontWeight: 700, color: gradeColor, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginTop: 3 }}>{s.label.toUpperCase()}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Coaching tip */}
+      <div style={{ background: "#FFFFFF", borderRadius: "0 0 14px 14px", padding: "12px 16px 14px", marginBottom: 16, borderTop: "1px solid #E8EDF1" }}>
+        <div style={{ ...TM, color: "#CC0000", fontSize: 7, letterSpacing: 2, marginBottom: 6 }}>▸ COACHING NOTE</div>
+        <p style={{ ...TM, fontSize: 11, color: "#1A2A3A", lineHeight: 1.6, margin: 0 }}>{coaching.tip}</p>
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={onHome} style={btn("transparent", C.pine, { border: `1px solid ${C.line}`, flex: 1 })}>Home</button>
-        <button onClick={onAgain} style={btn(C.pine, C.paper, { flex: 1 })}>Play again →</button>
+        <button onClick={onHome} style={{ flex: 1, padding: "13px 0", borderRadius: 10, border: "1px solid #D0D8E0", background: "#FFFFFF", color: "#0B1F3A", cursor: "pointer", fontFamily: "'Spline Sans Mono',monospace", fontSize: 12, fontWeight: 600 }}>
+          Home
+        </button>
+        <button onClick={onAgain} style={{ flex: 1, padding: "13px 0", borderRadius: 10, border: "none", background: "#CC0000", color: "#FFFFFF", cursor: "pointer", fontFamily: "'Spline Sans Mono',monospace", fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
+          Run It Back →
+        </button>
       </div>
     </div>
   );

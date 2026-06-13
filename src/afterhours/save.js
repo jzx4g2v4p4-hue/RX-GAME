@@ -21,6 +21,8 @@ const DEFAULT = {
   },
   settings: { narrator: 'pro', sound: true },
   ageGateAccepted: false,
+  achievements: [],
+  stars: {},
 };
 
 /* Rank ladder — threshold is lifetimeEarned */
@@ -47,6 +49,8 @@ export function loadSave() {
       stats: { ...DEFAULT.stats, ...(p.stats || {}) },
       settings: { ...DEFAULT.settings, ...(p.settings || {}) },
       lastPlayed: { ...(p.lastPlayed || {}) },
+      achievements: [...(p.achievements || [])],
+      stars: { ...(p.stars || {}) },
       relationships: {
         jada:  { ...DEFAULT.relationships.jada,  ...(p.relationships?.jada  || {}) },
         simone: { ...DEFAULT.relationships.simone, ...(p.relationships?.simone || {}) },
@@ -165,5 +169,18 @@ export function recordActivity(modeId, save, setSave) {
     dailyStreak: streak,
     lastActiveDate: today,
   };
+  write(next); setSave(next); return next;
+}
+
+export function earnAchievement(id, save, setSave) {
+  if (save.achievements?.some(a => a.id === id)) return save;
+  const next = { ...save, achievements: [...(save.achievements || []), { id, earnedAt: new Date().toISOString() }] };
+  write(next); setSave(next); return next;
+}
+
+export function recordStars(modeId, starCount, save, setSave) {
+  const current = save.stars?.[modeId] || 0;
+  if (starCount <= current) return save;
+  const next = { ...save, stars: { ...(save.stars || {}), [modeId]: starCount } };
   write(next); setSave(next); return next;
 }
