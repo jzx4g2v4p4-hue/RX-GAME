@@ -10,6 +10,7 @@ const DEFAULT = {
   lifetimeEarned: 0,
   stats: { speed: 0, accuracy: 0, counseling: 0, law: 0 },
   shifts: 0,
+  drills: 0,
   lastPlayed: {},
   dailyStreak: 0,
   lastActiveDate: "",
@@ -104,6 +105,7 @@ export function recordDrillResult({ correct, total, modeTag, save, setSave }) {
     ...save,
     currency: save.currency + earn,
     lifetimeEarned: save.lifetimeEarned + earn,
+    drills: (save.drills || 0) + 1,
     stats: {
       ...save.stats,
       accuracy: save.stats.accuracy + accGain,

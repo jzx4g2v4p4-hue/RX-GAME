@@ -4929,6 +4929,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   const bellPenaltyRef = useRef(0);
   const malpracticeTimerRef = useRef(null);
   const chainToastRef = useRef(null);
+  const qv1CaughtRef = useRef(0);
   const bell = useDriveThruBell(!auditOpen);
 
   useEffect(() => () => {
@@ -5001,6 +5002,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       serviceScore,
       chainXp,
       chainLoad,
+      qv1ErrorsCaught: qv1CaughtRef.current,
     };
   }
 
@@ -5090,6 +5092,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     setToVerifyData((q) => q.filter((item) => item.id !== rx.id));
     setInProduction((q) => [...q, ticket]);
     const caught = rx.qv1Error && qv1Correct;
+    if (caught) qv1CaughtRef.current += 1;
     const xp  = caught ? 10 : qv1Correct ? 5 : 0;
     const svc = caught ?  3 : qv1Correct ? 1 : -6;
     addShiftXp(xp, svc, caught ? "Error caught! +10 XP" : qv1Correct ? "QV1 clean: +5 XP" : "QV1 miss — service hit");
@@ -6010,8 +6013,10 @@ export default function App() {
     if (pct === 100 && mode === 5)  s = triggerAchievement("dur_zero",      s, setSave);
     if (pct === 100 && mode === 3)  s = triggerAchievement("patient_champ", s, setSave);
     if (pct === 100 && mode === 12) s = triggerAchievement("perfect_qv2",   s, setSave);
+    if ((res.qv1ErrorsCaught || 0) >= 1) s = triggerAchievement("eagle_eye",    s, setSave);
+    if ((res.qv1ErrorsCaught || 0) >= 3) s = triggerAchievement("eagle_streak", s, setSave);
     if (res.bestStreak >= 10)       s = triggerAchievement("speed_demon",   s, setSave);
-    if ((s.shifts || 0) + totalDrills >= 25) s = triggerAchievement("the_grind", s, setSave);
+    if ((s.drills || 0) >= 25) s = triggerAchievement("the_grind", s, setSave);
     const playedModes = new Set(Object.keys(s.lastPlayed || {}).map(Number));
     if (MODES.every(m => playedModes.has(m.id))) s = triggerAchievement("all_stations", s, setSave);
     const prevRank = getRank((s.lifetimeEarned || 0) - (res.correct || 0) * 3);
@@ -6476,6 +6481,33 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
                   </button>
                 );
               })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── ACHIEVEMENTS GALLERY ── */}
+      {save?.achievements?.length > 0 && (() => {
+        const earned = save.achievements.map(a => ACHIEVEMENTS.find(def => def.id === a.id)).filter(Boolean);
+        return (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5 }}>▸ ACHIEVEMENTS</span>
+              <span style={{ ...TM, fontSize: 9, color: "#4A8FA5" }}>{earned.length}/{ACHIEVEMENTS.length}</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {earned.map(a => (
+                <div key={a.id} title={`${a.title}: ${a.desc}`}
+                  style={{ background: "#0B1F3A", borderRadius: 8, padding: "5px 9px", display: "flex", alignItems: "center", gap: 5, border: `1px solid ${RARITY_COLOR[a.rarity]}44` }}>
+                  <span style={{ fontSize: 14, lineHeight: 1 }}>{a.icon}</span>
+                  <span style={{ ...TM, fontSize: 8, color: RARITY_COLOR[a.rarity], fontWeight: 700 }}>{a.title}</span>
+                </div>
+              ))}
+              {Array.from({ length: ACHIEVEMENTS.length - earned.length }).map((_, i) => (
+                <div key={`lock-${i}`} style={{ background: "rgba(0,0,0,0.12)", borderRadius: 8, padding: "5px 9px", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <span style={{ fontSize: 14, lineHeight: 1, filter: "grayscale(1) opacity(0.25)" }}>?</span>
+                </div>
+              ))}
             </div>
           </div>
         );
