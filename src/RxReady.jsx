@@ -4519,17 +4519,93 @@ function generateQv1Error(drug, strength, qty, sig, seedIndex) {
 }
 
 const CVS_PLANS = [
-  "Caremark / CVS Health",
-  "SilverScript (Part D)",
-  "Aetna CVS Health",
-  "Blue Cross / Caremark",
-  "Medicaid / Virginia",
-  "Tricare / DoD",
-  "UnitedHealth / OptumRx",
-  "Humana / Walmart",
-  "Cash / No Insurance",
+  { name: "Caremark / CVS Health",    bin: "004336", pcn: "ADV",    grp: "RX6682",   memberFmt: "CMK", tiers: { G: 0,  PB: 15, NB: 45,  SP: 100 } },
+  { name: "SilverScript (Part D)",    bin: "020099", pcn: "S5790",  grp: "S5790001", memberFmt: "0SS", tiers: { G: 0,  PB: 7,  NB: 30,  SP: 75  } },
+  { name: "Aetna CVS Health",         bin: "610191", pcn: "AETCVS", grp: "AETCVS01", memberFmt: "W",   tiers: { G: 10, PB: 25, NB: 55,  SP: 150 } },
+  { name: "Blue Cross / Caremark",    bin: "004336", pcn: "BCBS",   grp: "BCBS6682", memberFmt: "XYZ", tiers: { G: 5,  PB: 20, NB: 50,  SP: 125 } },
+  { name: "Virginia Medicaid",        bin: "610011", pcn: "VA",     grp: "VAMCAD01", memberFmt: "9VA", tiers: { G: 0,  PB: 0,  NB: 1,   SP: 3   } },
+  { name: "Tricare / Express Scripts",bin: "610115", pcn: "MEDCO",  grp: "TRICARE",  memberFmt: "DOD", tiers: { G: 0,  PB: 0,  NB: 14,  SP: 42  } },
+  { name: "UnitedHealth / OptumRx",   bin: "610011", pcn: "OPTM",   grp: "OPTUMRX",  memberFmt: "U",   tiers: { G: 10, PB: 30, NB: 60,  SP: 200 } },
+  { name: "Humana / Walmart",         bin: "610281", pcn: "HUM",    grp: "HUM0001",  memberFmt: "H",   tiers: { G: 0,  PB: 5,  NB: 45,  SP: 100 } },
+  { name: "Cash / No Insurance",      bin: null,     pcn: null,     grp: null,        memberFmt: null,  tiers: null },
 ];
 const SCRIPT_TYPES = ["eRx", "eRx", "eRx", "FAX", "FAX", "PHONE", "DROP"];
+
+const CS_SCHEDULE = {
+  oxycodone:"CII", hydrocodone:"CII", fentanyl:"CII", morphine:"CII",
+  hydromorphone:"CII", oxymorphone:"CII", methadone:"CII", codeine:"CII",
+  methylphenidate:"CII", amphetamine:"CII",
+  buprenorphine:"CIII", testosterone:"CIII",
+  tramadol:"CIV", alprazolam:"CIV", diazepam:"CIV", lorazepam:"CIV",
+  clonazepam:"CIV", temazepam:"CIV", zolpidem:"CIV",
+  gabapentin:"CV",
+};
+function getCsSchedule(drug) {
+  const d = (drug || "").toLowerCase();
+  for (const [key, sched] of Object.entries(CS_SCHEDULE)) {
+    if (d.includes(key)) return sched;
+  }
+  return null;
+}
+
+const DRUG_NDC = {
+  lisinopril:"00093-1234-01", atorvastatin:"00093-7193-98",
+  metformin:"00093-1044-05", amlodipine:"00228-2776-10",
+  levothyroxine:"00527-1348-01", metoprolol:"00378-0051-01",
+  sertraline:"00093-7153-10", omeprazole:"68084-0247-11",
+  losartan:"00093-7365-10", albuterol:"00085-1132-01",
+  amoxicillin:"00781-1228-10", azithromycin:"00093-7146-56",
+  cephalexin:"00093-3145-28", prednisone:"00054-4742-25",
+  warfarin:"00056-0170-70", apixaban:"59148-0020-10",
+  hydrochlorothiazide:"00781-2013-10", gabapentin:"00228-2012-10",
+  tramadol:"00406-0371-01", verapamil:"00074-3286-13",
+  lamotrigine:"00093-0083-10", hydroxyzine:"00093-0529-10",
+  clarithromycin:"00074-3368-50",
+};
+function getDrugNdc(drug) {
+  const d = (drug || "").toLowerCase();
+  for (const [key, ndc] of Object.entries(DRUG_NDC)) {
+    if (d.includes(key)) return ndc;
+  }
+  const h = d.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return `${String(h % 99999).padStart(5,"0")}-${String((h*7)%9999).padStart(4,"0")}-${String((h*3)%99).padStart(2,"0")}`;
+}
+
+const ALLERGY_PROFILES = [
+  "NKDA","PCN — RASH","SULFA — HIVES","CODEINE — NAUSEA/VOMITING",
+  "NSAIDS — GI BLEED HX","NKDA","NKDA","LISINOPRIL — ANGIOEDEMA",
+  "ERYTHROMYCIN — RASH","NKDA","PENICILLIN — ANAPHYLAXIS","NKDA",
+];
+function getPatientAllergies(patient) {
+  const h = (patient || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return ALLERGY_PROFILES[h % ALLERGY_PROFILES.length];
+}
+
+function getMemberId(plan, seed) {
+  if (!plan?.memberFmt) return "CASH";
+  const h = Math.abs(seed) % 100000000;
+  if (plan.memberFmt === "CMK") return `CMK${String(h).padStart(9,"0")}`;
+  if (plan.memberFmt === "0SS") return `0SS${String(h).padStart(7,"0")}`;
+  if (plan.memberFmt === "W")   return `W${String(h).padStart(9,"0")}`;
+  if (plan.memberFmt === "XYZ") return `XYZ${String(h).padStart(8,"0")}`;
+  if (plan.memberFmt === "9VA") return `9VA${String(h).padStart(8,"0")}`;
+  if (plan.memberFmt === "DOD") return `DOD${String(h).padStart(10,"0")}`;
+  if (plan.memberFmt === "U")   return `U${String(h).padStart(9,"0")}`;
+  if (plan.memberFmt === "H")   return `H${String(h).padStart(8,"0")}`;
+  return `${plan.memberFmt}${String(h).padStart(8,"0")}`;
+}
+
+function getDrugTier(drug) {
+  const d = (drug || "").toLowerCase();
+  if (d.includes("apixaban")||d.includes("eliquis")||d.includes("tirzepatide")||d.includes("semaglutide")||d.includes("ozempic")||d.includes("dupixent")) return "SP";
+  if (d.includes("atorvastatin")||d.includes("metformin")||d.includes("lisinopril")||d.includes("metoprolol")||d.includes("amlodipine")||d.includes("sertraline")||d.includes("omeprazole")||d.includes("losartan")||d.includes("levothyroxine")) return "G";
+  if (d.includes("jardiance")||d.includes("empagliflozin")||d.includes("xarelto")||d.includes("rivaroxaban")||d.includes("albuterol")) return "PB";
+  return "NB";
+}
+function getPatientCopay(plan, drug) {
+  if (!plan?.tiers) return null;
+  return plan.tiers[getDrugTier(drug)];
+}
 
 function managerRxFromFillCase(c, i, level = 4) {
   const lanes = ["Drive-thru", "Counter", "Waiter", "Phone"];
@@ -4538,6 +4614,13 @@ function managerRxFromFillCase(c, i, level = 4) {
   const patienceMs = baseByLevel + spread;
   const rxNum = String(Math.floor(1000000 + ((i * 912347 + 5483921) % 8999999)));
   const qv1Error = generateQv1Error(c.rx.drug, c.rx.strength, c.rx.qty, c.rx.sig, i);
+  const plan = CVS_PLANS[i % CVS_PLANS.length];
+  const patientSeed = (c.rx.patient || "").split("").reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const csSchedule = getCsSchedule(c.rx.drug);
+  const copay = getPatientCopay(plan, c.rx.drug);
+  const memberId = getMemberId(plan, patientSeed + i * 37);
+  const minClinic = (i % 7 === 3);
+  const srcLabel = minClinic ? "MinuteClinic eRx" : SCRIPT_TYPES[i % SCRIPT_TYPES.length];
   return {
     id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
     patient: c.rx.patient,
@@ -4551,10 +4634,14 @@ function managerRxFromFillCase(c, i, level = 4) {
     deEscalated: false,
     fillCase: c,
     rxNum,
-    insurancePlan: CVS_PLANS[i % CVS_PLANS.length],
-    scriptType: SCRIPT_TYPES[i % SCRIPT_TYPES.length],
+    insurancePlan: plan.name,
+    plan,
+    memberId,
+    copay,
+    scriptType: srcLabel,
+    csSchedule,
     qv1Error,
-    daw: "0",
+    daw: csSchedule === "CII" ? "1" : "0",
   };
 }
 
@@ -5190,17 +5277,23 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       </button>
     );
   };
-  function prescriberFor(drug) {
+  function prescriberFor(drug, scriptType) {
     const d = (drug || "").toLowerCase();
-    if (d.includes("metoprolol") || d.includes("verapamil") || d.includes("amlodipine"))
-      return { name: "Dr. J. Carver, MD", spec: "Cardiology", npi: "NPI 1609872340", phone: "(804) 555-0118" };
-    if (d.includes("lisinopril") || d.includes("atorvastatin") || d.includes("warfarin"))
-      return { name: "Dr. S. Okafor, MD", spec: "Internal Medicine", npi: "NPI 1245870961", phone: "(804) 555-0142" };
-    if (d.includes("sertraline") || d.includes("lamotrigine"))
-      return { name: "Dr. L. Webb, PMHNP", spec: "Psychiatry / Neurology", npi: "NPI 1376082451", phone: "(804) 555-0271" };
-    if (d.includes("metformin") || d.includes("levothyroxine"))
-      return { name: "Dr. A. Chen, MD", spec: "Endocrinology", npi: "NPI 1457823091", phone: "(804) 555-0399" };
-    return { name: "Dr. P. Quinn, MD", spec: "Family Medicine", npi: "NPI 1023948576", phone: "(804) 555-0087" };
+    if ((scriptType || "").includes("MinuteClinic"))
+      return { name: "NP M. Torres, FNP-C", spec: "CVS MinuteClinic", npi: "NPI 1982340712", phone: "(804) 555-0500", dea: null, clinic: "MinuteClinic #4821 · Richmond VA" };
+    if (d.includes("oxycodone")||d.includes("hydrocodone")||d.includes("morphine")||d.includes("fentanyl")||d.includes("tramadol"))
+      return { name: "Dr. R. Santos, MD", spec: "Pain Management", npi: "NPI 1832094571", phone: "(804) 555-0234", dea: "BS4823901", clinic: null };
+    if (d.includes("alprazolam")||d.includes("lorazepam")||d.includes("clonazepam")||d.includes("diazepam"))
+      return { name: "Dr. L. Webb, PMHNP", spec: "Psychiatry / Neurology", npi: "NPI 1376082451", phone: "(804) 555-0271", dea: "BW7412093", clinic: null };
+    if (d.includes("methylphenidate")||d.includes("amphetamine"))
+      return { name: "Dr. T. Park, MD", spec: "Pediatric Psychiatry", npi: "NPI 1594820371", phone: "(804) 555-0315", dea: "BP3920481", clinic: null };
+    if (d.includes("metoprolol")||d.includes("verapamil")||d.includes("amlodipine")||d.includes("lisinopril")||d.includes("atorvastatin")||d.includes("warfarin")||d.includes("apixaban"))
+      return { name: "Dr. J. Carver, MD", spec: "Cardiology", npi: "NPI 1609872340", phone: "(804) 555-0118", dea: null, clinic: null };
+    if (d.includes("sertraline")||d.includes("lamotrigine"))
+      return { name: "Dr. L. Webb, PMHNP", spec: "Psychiatry / Neurology", npi: "NPI 1376082451", phone: "(804) 555-0271", dea: null, clinic: null };
+    if (d.includes("metformin")||d.includes("levothyroxine")||d.includes("semaglutide")||d.includes("tirzepatide")||d.includes("empagliflozin"))
+      return { name: "Dr. A. Chen, MD", spec: "Endocrinology", npi: "NPI 1457823091", phone: "(804) 555-0399", dea: null, clinic: null };
+    return { name: "Dr. P. Quinn, MD", spec: "Family Medicine", npi: "NPI 1023948576", phone: "(804) 555-0087", dea: null, clinic: null };
   }
   function patientDob(patient) {
     const h = (patient || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -5219,7 +5312,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     const c = rx.fillCase;
     const f = c.fill;
     const ref = c.ref;
-    const prescriber = prescriberFor(rx.drug);
+    const prescriber = prescriberFor(rx.drug, rx.scriptType);
     const dob = patientDob(rx.patient);
     const refills = refillsFor(rx.drug);
 
@@ -5276,17 +5369,30 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       const sysQty      = qv1Error?.field === "quantity" ? qv1Error.entered : String(rx.qty);
       const sysSig      = qv1Error?.field === "sig"      ? qv1Error.entered : rx.sig;
 
+      const rxNdc = getDrugNdc(rx.drug);
+      const calcDaysSupply = (() => {
+        const qty = Number(rx.qty) || 0;
+        const s = (rx.sig || "").toLowerCase();
+        let freq = 1;
+        if (s.includes("bid")||s.includes("twice")||s.includes("q12")||s.includes("2x")) freq = 2;
+        else if (s.includes("tid")||s.includes("three")||s.includes("q8")||s.includes("3x")) freq = 3;
+        else if (s.includes("qid")||s.includes("four")||s.includes("q6")||s.includes("4x")) freq = 4;
+        if (s.includes("ml") && qty > 30) return String(Math.round(qty / (5 * Math.max(freq, 1))));
+        return String(Math.round(qty / Math.max(freq, 1)));
+      })();
       const compareRows = [
+        { id: "ndc",      label: "NDC",             hc: rxNdc,                sys: rxNdc },
         { id: "drug",     label: "Drug",            hc: rx.drug,              sys: rx.drug },
         { id: "strength", label: "Strength",        hc: rx.strength,          sys: sysStrength },
         { id: "quantity", label: "Quantity",        hc: `#${rx.qty}`,         sys: `#${sysQty}` },
+        { id: "days",     label: "Days Supply",     hc: calcDaysSupply,       sys: calcDaysSupply },
         { id: "sig",      label: "Directions (Sig)", hc: rx.sig,              sys: sysSig },
         { id: "daw",      label: "DAW",             hc: `DAW-${rx.daw||"0"}`, sys: `DAW-${rx.daw||"0"}` },
         { id: "refills",  label: "Refills",         hc: String(refills),      sys: String(refills) },
       ];
 
-      const FIELD_LABELS = ["Drug", "Strength", "Quantity", "Directions (Sig)", "DAW", "Refills"];
-      const labelToField = { "Drug":"drug","Strength":"strength","Quantity":"quantity","Directions (Sig)":"sig","DAW":"daw","Refills":"refills" };
+      const FIELD_LABELS = ["NDC","Drug","Strength","Quantity","Days Supply","Directions (Sig)","DAW","Refills"];
+      const labelToField = { "NDC":"ndc","Drug":"drug","Strength":"strength","Quantity":"quantity","Days Supply":"days","Directions (Sig)":"sig","DAW":"daw","Refills":"refills" };
 
       const CompareTable = () => (
         <div style={{ borderRadius: 7, overflow: "hidden", border: "1px solid #D0D8E0" }}>
@@ -5309,18 +5415,52 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
         <ModalWrap>
           <ModalHeader title="DATA VERIFICATION" sub="QV1 — COMPARE ENTRIES" />
           <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", padding: "10px 14px 12px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingBottom: 10, marginBottom: 10, borderBottom: "1px dashed #E0E8EF" }}>
-              <div>
-                <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PATIENT</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
-                <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>DOB: {dob}</div>
-              </div>
-              <div>
-                <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PRESCRIBER</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#0B1F3A" }}>{prescriber.name}</div>
-                <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{prescriber.spec} · {prescriber.npi}</div>
-              </div>
-            </div>
+            {(() => {
+              const allergy = getPatientAllergies(rx.patient);
+              const allergyRed = !allergy.startsWith("NKDA");
+              return (
+                <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px dashed #E0E8EF" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 7 }}>
+                    <div>
+                      <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PATIENT</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
+                      <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>DOB: {dob}</div>
+                    </div>
+                    <div>
+                      <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PRESCRIBER</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#0B1F3A" }}>{prescriber.name}</div>
+                      <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{prescriber.spec} · {prescriber.npi}</div>
+                      {prescriber.dea && <div style={{ ...TM, fontSize: 8, color: "#FF4444", fontWeight: 700, marginTop: 1 }}>DEA: {prescriber.dea}</div>}
+                      {prescriber.clinic && <div style={{ ...TM, fontSize: 8, color: "#CC0000", marginTop: 1 }}>{prescriber.clinic}</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: rx.csSchedule ? 7 : 0 }}>
+                    <div style={{ background: allergyRed ? "rgba(204,0,0,0.07)" : "rgba(63,185,80,0.06)", borderRadius: 6, padding: "5px 8px", border: `1px solid ${allergyRed ? "rgba(204,0,0,0.25)" : "rgba(63,185,80,0.2)"}` }}>
+                      <div style={{ ...TM, fontSize: 6.5, color: allergyRed ? "#CC0000" : "#3FB950", letterSpacing: 1, marginBottom: 1 }}>ALLERGIES ON FILE</div>
+                      <div style={{ ...TM, fontSize: 9, fontWeight: 700, color: allergyRed ? "#CC0000" : "#3FB950" }}>{allergy}</div>
+                    </div>
+                    {rx.plan?.bin ? (
+                      <div style={{ background: "rgba(11,31,58,0.04)", borderRadius: 6, padding: "5px 8px", border: "1px solid rgba(11,31,58,0.1)" }}>
+                        <div style={{ ...TM, fontSize: 6.5, color: "#4A8FA5", letterSpacing: 1, marginBottom: 1 }}>INSURANCE / NCPDP</div>
+                        <div style={{ ...TM, fontSize: 8, fontWeight: 700, color: "#0B1F3A" }}>BIN {rx.plan.bin} · PCN {rx.plan.pcn}</div>
+                        <div style={{ ...TM, fontSize: 7.5, color: "#5A7080" }}>GRP {rx.plan.grp}</div>
+                        <div style={{ ...TM, fontSize: 7.5, color: "#5A7080" }}>ID: {rx.memberId || "—"}</div>
+                      </div>
+                    ) : (
+                      <div style={{ background: "rgba(0,0,0,0.04)", borderRadius: 6, padding: "5px 8px", border: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center" }}>
+                        <div style={{ ...TM, fontSize: 9, color: "#6A7A8A", fontWeight: 700 }}>CASH — No Insurance</div>
+                      </div>
+                    )}
+                  </div>
+                  {rx.csSchedule && (
+                    <div style={{ background: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.35)", borderRadius: 6, padding: "6px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ ...TM, fontSize: 11, fontWeight: 900, color: "#FF4444" }}>{rx.csSchedule}</span>
+                      <span style={{ ...TM, fontSize: 8, color: "#CC2222" }}>CONTROLLED — Verify DEA · Written Rx required for CII · Log required</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{ ...TM, fontSize: 8, color: "#CC0000", letterSpacing: 1.5, marginBottom: 8, fontWeight: 700 }}>
               COMPARE HARD COPY ↔ SYSTEM ENTRY — FIND ANY MISMATCH
             </div>
@@ -5586,9 +5726,16 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                 <span style={{ ...TM, color: "#E8F4F8", fontSize: 10, fontWeight: 700 }}>{rx.patient}</span>
                 <span style={{ ...TM, color: "#7EB8C9", fontSize: 8 }}>Rx#{rx.rxNum}</span>
               </div>
-              <div style={{ background: "#F8F9FA", padding: "4px 10px", borderBottom: "1px solid #E8EDF1", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ ...TM, fontSize: 8, color: "#5A7080" }}>{rx.insurancePlan || "Cash"}</span>
-                <span style={{ ...TM, fontSize: 7, color: rx.lane === "Drive-thru" ? "#FFB800" : rx.lane === "Waiter" ? "#FF4444" : "#3FB950", fontWeight: 700 }}>{rx.lane?.toUpperCase()}</span>
+              <div style={{ background: "#F8F9FA", padding: "5px 10px", borderBottom: "1px solid #E8EDF1" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                  <span style={{ ...TM, fontSize: 8, color: "#5A7080" }}>{rx.insurancePlan || "Cash"}{rx.copay != null ? ` — $${rx.copay} co-pay` : ""}</span>
+                  <span style={{ ...TM, fontSize: 7, color: rx.lane === "Drive-thru" ? "#FFB800" : rx.lane === "Waiter" ? "#FF4444" : "#3FB950", fontWeight: 700 }}>{rx.lane?.toUpperCase()}</span>
+                </div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  <span style={{ ...TM, fontSize: 7, color: "#4A8FA5", background: "rgba(74,143,165,0.1)", borderRadius: 3, padding: "1px 5px" }}>{rx.scriptType || "eRx"}</span>
+                  {rx.csSchedule && <span style={{ ...TM, fontSize: 7, fontWeight: 700, color: "#FF4444", background: "rgba(255,68,68,0.12)", borderRadius: 3, padding: "1px 5px" }}>{rx.csSchedule}</span>}
+                  {rx.plan?.bin && <span style={{ ...TM, fontSize: 7, color: "#7A8A9A", background: "rgba(0,0,0,0.05)", borderRadius: 3, padding: "1px 5px" }}>BIN {rx.plan.bin}</span>}
+                </div>
               </div>
               <div style={{ padding: "8px 10px 10px" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1A2A35" }}>{rx.drug}</div>
