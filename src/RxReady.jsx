@@ -5246,8 +5246,8 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     );
 
     const ModalWrap = ({ children }) => (
-      <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(7,21,35,0.94)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "12px", overflowY: "auto" }}>
-        <div style={{ width: "min(500px,100%)", background: "#F2F5F7", borderRadius: 12, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.7)" }}>
+      <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(7,21,35,0.94)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "12px 12px max(12px, env(safe-area-inset-bottom))", overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ width: "min(500px,100%)", maxHeight: "calc(100dvh - 24px)", background: "#F2F5F7", borderRadius: 12, overflowY: "auto", WebkitOverflowScrolling: "touch", boxShadow: "0 24px 60px rgba(0,0,0,0.7)" }}>
           {children}
         </div>
       </div>
@@ -5469,7 +5469,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
           </div>
         </div>
 
-        <div style={{ padding: "10px 12px 16px", display: "grid", gap: 8 }}>
+        <div style={{ position: "sticky", bottom: 0, padding: "10px 12px max(16px, env(safe-area-inset-bottom))", display: "grid", gap: 8, background: "#F2F5F7", borderTop: "1px solid #D0D8E0", boxShadow: "0 -10px 24px rgba(7,21,35,0.08)" }}>
           <button onClick={() => { finalAction(rx, "approve"); onClose(); }} style={{ ...TM, padding: "13px 0", background: "#0B1F3A", color: "#3FB950", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, cursor: "pointer" }}>
             ✓ APPROVE — RELEASE TO PICKUP
           </button>
