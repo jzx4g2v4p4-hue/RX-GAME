@@ -4690,6 +4690,100 @@ function managerRxFromFillCase(c, i, level = 4) {
   };
 }
 
+const COUNSELING_SCRIPTS = {
+  lisinopril: {
+    indication: "Hypertension / Heart Failure",
+    question: "What is the #1 counseling point for a patient starting lisinopril?",
+    options: ["A dry cough is common — call your doctor if it persists or bothers you", "Take on an empty stomach every morning", "Avoid all leafy greens while on this medication", "May cause drowsiness — do not drive"],
+    answer: 0,
+    tip: "ACE inhibitor cough affects ~10% of patients. Also counsel: report throat/tongue swelling immediately (angioedema), avoid NSAIDs and potassium supplements.",
+  },
+  atorvastatin: {
+    indication: "High Cholesterol / CV Risk Reduction",
+    question: "What symptom must a patient on atorvastatin report to their doctor right away?",
+    options: ["Mild headache", "Unexplained muscle pain, tenderness, or weakness", "Dry mouth", "Occasional heartburn"],
+    answer: 1,
+    tip: "Statin-related myopathy can progress to rhabdomyolysis. Counsel: take at any time of day consistently; avoid grapefruit with some statins; liver monitoring may be ordered.",
+  },
+  metformin: {
+    indication: "Type 2 Diabetes",
+    question: "When should a patient take metformin to reduce GI side effects?",
+    options: ["On an empty stomach first thing in the morning", "With meals or immediately after eating", "At bedtime only", "Only when blood sugar is high"],
+    answer: 1,
+    tip: "GI effects (nausea, diarrhea) are the most common reason patients stop metformin. Also counsel: hold before contrast dye procedures; report unusual fatigue or breathing difficulty (rare lactic acidosis).",
+  },
+  levothyroxine: {
+    indication: "Hypothyroidism",
+    question: "When is the best time to take levothyroxine for optimal absorption?",
+    options: ["With breakfast for consistent routine", "30–60 minutes before eating on an empty stomach", "At bedtime with a glass of milk", "With calcium or iron supplements"],
+    answer: 1,
+    tip: "Absorption drops significantly with food, Ca, Fe, antacids, and PPIs. Counsel: take at the same time each day; don't switch brands without telling your doctor; symptoms may take 6–8 weeks to improve.",
+  },
+  sertraline: {
+    indication: "Depression / Anxiety",
+    question: "What should a patient starting sertraline know about the timeline of effectiveness?",
+    options: ["It works within 24–48 hours", "Full benefit typically takes 4–6 weeks", "It only works if taken with food every time", "It loses effectiveness after 30 days"],
+    answer: 1,
+    tip: "SSRIs may temporarily worsen anxiety in the first 1–2 weeks. Counsel: do NOT stop abruptly (taper under doctor's direction); report suicidal thoughts (black-box warning in patients <25); avoid alcohol.",
+  },
+  amlodipine: {
+    indication: "Hypertension / Angina",
+    question: "Which side effect of amlodipine should you warn the patient about?",
+    options: ["Dry persistent cough", "Ankle and foot swelling (peripheral edema)", "Severe hypoglycemia", "Photosensitivity — avoid sunlight"],
+    answer: 1,
+    tip: "Ankle edema from vasodilation is the most common complaint and can be mistaken for heart failure. Counsel: do not stop abruptly; the swelling is not dangerous but tell your doctor if it worsens.",
+  },
+  albuterol: {
+    indication: "Acute Bronchospasm / Asthma",
+    question: "What is the correct technique for albuterol rescue inhaler use?",
+    options: ["Inhale quickly and hold 1 second", "Shake well, exhale fully, inhale slowly and deeply, hold 10 seconds", "Take 4 puffs every hour", "Swallow the propellant after inhaling"],
+    answer: 1,
+    tip: "Shake before EVERY puff. Wait 30–60 seconds between puffs. If needing the rescue inhaler more than 2×/week, controller therapy may be needed — counsel patient to tell their doctor.",
+  },
+  warfarin: {
+    indication: "Anticoagulation",
+    question: "What is the most important dietary counseling point for a patient on warfarin?",
+    options: ["Eliminate all vitamin K (leafy greens) from the diet completely", "Keep vitamin K intake consistent from week to week — don't drastically change it", "Eat extra spinach and kale to offset the medication", "Avoid all dairy products"],
+    answer: 1,
+    tip: "It's consistency, not elimination. Sudden changes in vitamin K shift the INR. Also counsel: INR monitoring schedule, signs of bleeding (unusual bruising, blood in urine/stool), and to tell ALL providers they are on warfarin.",
+  },
+  amoxicillin: {
+    indication: "Bacterial Infection",
+    question: "What is the most important instruction for completing a course of amoxicillin?",
+    options: ["Stop as soon as you feel better to reduce resistance", "Complete the entire course even if you feel better before it's done", "Double the dose if you miss one", "Take only when you have a fever"],
+    answer: 1,
+    tip: "Incomplete antibiotic courses contribute to resistance. Also counsel: can be taken with or without food; contact the pharmacy immediately if rash or hives develop (possible penicillin allergy).",
+  },
+  metoprolol: {
+    indication: "Hypertension / Heart Failure / Angina",
+    question: "What is the most critical instruction for a patient stopping metoprolol?",
+    options: ["Stop immediately if you feel dizzy", "Never stop abruptly — taper under your doctor's guidance to avoid rebound hypertension or chest pain", "You can stop any time without side effects", "Take an extra dose if you miss one day"],
+    answer: 1,
+    tip: "Abrupt beta-blocker discontinuation can cause rebound tachycardia, severe hypertension, or precipitate angina/MI in at-risk patients. Also counsel: ER metoprolol succinate (Toprol XL) should not be crushed.",
+  },
+  apixaban: {
+    indication: "Atrial Fibrillation / VTE Prevention",
+    question: "What should a patient on apixaban (Eliquis) be told about signs of bleeding?",
+    options: ["Minor bruising is fine — only go to the ER if you have a major fall", "Report unusual bruising, pink/brown urine, red or black stools, or prolonged bleeding from cuts", "Take a double dose if you miss one", "Aspirin is safe to combine with apixaban for extra protection"],
+    answer: 1,
+    tip: "DOACs require no routine INR monitoring but patients must recognize bleeding signs. Counsel: do not stop without doctor approval (clot risk); take doses 12 hours apart; tell all providers and dentists before any procedure.",
+  },
+};
+
+function getCounselingScript(drug) {
+  const d = (drug || "").toLowerCase();
+  for (const [key, script] of Object.entries(COUNSELING_SCRIPTS)) {
+    if (d.includes(key)) return script;
+  }
+  return {
+    indication: "New Therapy",
+    question: "What is always required before dispensing a first-fill prescription to a patient?",
+    options: ["Offering pharmacist counseling", "A written request from the prescriber", "Insurance pre-authorization", "A prior fill history at this pharmacy"],
+    answer: 0,
+    tip: "Virginia law and CVS policy require pharmacist counseling to be offered on all new prescriptions. Document if patient declines.",
+  };
+}
+
 function isSevereFillError(rx) {
   const fill = rx.fillCase?.fill;
   const note = (rx.fillCase?.note || "").toLowerCase();
@@ -5056,6 +5150,7 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   const [chainStreak, setChainStreak] = useState(0);
   const [chainToast, setChainToast] = useState(null);
   const [verifyModal, setVerifyModal] = useState(null);
+  const [counselingModal, setCounselingModal] = useState(null);
   const timers = useRef({});
   const pendingSummaryRef = useRef(null);
   const bellPenaltyRef = useRef(0);
@@ -5248,13 +5343,27 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     const nextPenalties = shiftPenalties + penaltyGain;
     const nextPenaltyCount = penaltyCount + (malpractice ? 1 : 0);
     const remaining = toVerifyData.length + inProduction.length + finalCheck.length - 1;
+    const ctx = { ok, malpractice, bonusGain, penaltyGain, nextCompleted, nextCorrect, nextBonuses, nextPenalties, nextPenaltyCount, remaining };
+
+    // Intercept: first-fill approval → counseling required
+    if (ok && !malpractice && rx.isFirstFill) {
+      setCounselingModal({ rx, ctx, answered: null });
+      return;
+    }
+    commitFinalAction(rx, ctx);
+  }
+
+  function commitFinalAction(rx, { ok, malpractice, bonusGain, penaltyGain, nextCompleted, nextCorrect, nextBonuses, nextPenalties, nextPenaltyCount, remaining }, counselingBonus = 0) {
     setFinalCheck((q) => q.filter((item) => item.id !== rx.id));
     setCompleted(nextCompleted);
     if (ok) setCorrect(nextCorrect);
     if (bonusGain) setShiftBonuses(nextBonuses);
-    addShiftXp(ok ? 12 : 0, ok ? 3 : -8, ok ? "QV2 clean check: +12 XP" : "Verification miss: service score hit");
+    const baseXp = ok ? 12 : 0;
+    const baseScore = ok ? 3 : -8;
+    const baseMsg = ok ? `QV2 verified: +${baseXp + counselingBonus} XP` : "Verification miss: service score hit";
+    addShiftXp(baseXp + counselingBonus, baseScore + (counselingBonus > 0 ? 2 : 0), baseMsg);
     if (malpractice) {
-      setShiftPenalties(nextPenalties);
+      setShiftPenalties(penaltyGain);
       setPenaltyCount(nextPenaltyCount);
       setServiceScore((score) => Math.max(0, score - 25));
       setChainStreak(0);
@@ -5263,6 +5372,15 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       malpracticeTimerRef.current = window.setTimeout(() => setMalpracticeFlash(null), 2200);
     }
     if (remaining <= 0) startSafeAudit(nextCompleted, nextCorrect, nextBonuses, nextPenalties, nextPenaltyCount);
+  }
+
+  function resolveCounseling(modal, outcome) {
+    // outcome: "correct" | "wrong" | "refused"
+    setCounselingModal(null);
+    const bonus = outcome === "correct" ? 10 : outcome === "refused" ? 2 : 0;
+    const msg = outcome === "correct" ? "Counseled! +22 XP" : outcome === "refused" ? "Refusal documented: +14 XP" : "Counseling skipped";
+    commitFinalAction(modal.rx, modal.ctx, bonus);
+    if (outcome === "correct" || outcome === "refused") flashChainToast(msg);
   }
 
   const PressureMeter = ({ rx }) => {
@@ -5726,6 +5844,100 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   return (
     <div>
       {verifyModal && <ScriptModal vm={verifyModal} onClose={() => setVerifyModal(null)} />}
+      {counselingModal && (() => {
+        const { rx, answered } = counselingModal;
+        const script = getCounselingScript(rx.drug);
+        const OV = { position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:9900, display:"flex", alignItems:"center", justifyContent:"center", padding:16 };
+        const CD = { background:"#0B1F3A", borderRadius:10, width:"100%", maxWidth:520, boxShadow:"0 8px 40px rgba(0,0,0,0.7)", overflow:"hidden", ...TM };
+        const HDR = (title, sub) => (
+          <div style={{ background:"#CC0000", padding:"14px 18px" }}>
+            {sub && <div style={{ color:"rgba(255,255,255,0.65)", fontSize:9, letterSpacing:2, marginBottom:4 }}>{sub}</div>}
+            <div style={{ color:"#fff", fontWeight:700, fontSize:15 }}>{title}</div>
+          </div>
+        );
+        const BTN = (label, onClick, bg="#CC0000", fg="#fff", border="none") => (
+          <button onClick={onClick} style={{ display:"block", width:"100%", background:bg, color:fg, border, borderRadius:6, padding:"13px 0", fontWeight:700, fontSize:13, cursor:"pointer", ...TM }}>{label}</button>
+        );
+
+        if (answered === "refused") return (
+          <div style={OV}><div style={CD}>
+            {HDR("COUNSELING REFUSAL — DOCUMENT", "RXCONNECT · PATIENT INTERACTION")}
+            <div style={{ padding:"20px 18px" }}>
+              <div style={{ background:"rgba(255,184,0,0.1)", border:"1px solid rgba(255,184,0,0.35)", borderRadius:6, padding:"12px 14px", marginBottom:18 }}>
+                <div style={{ color:"#FFB800", fontSize:11, fontWeight:700, letterSpacing:1 }}>⚠ VIRGINIA LAW DOCUMENTATION</div>
+                <div style={{ color:"#E8EDF1", fontSize:12, marginTop:6, lineHeight:1.6 }}>
+                  Patient <strong style={{ color:"#fff" }}>{rx.patient}</strong> declined pharmacist counseling for <strong style={{ color:"#FFB800" }}>{rx.drug}</strong> (first fill). Refusal recorded per VDACS §54.1-3319.
+                </div>
+              </div>
+              {BTN("CONFIRM & DOCUMENT REFUSAL → +2 XP", () => resolveCounseling(counselingModal, "refused"))}
+            </div>
+          </div></div>
+        );
+
+        if (answered === "correct" || answered === "wrong") {
+          const isCorrect = answered === "correct";
+          return (
+            <div style={OV}><div style={CD}>
+              <div style={{ background: isCorrect ? "#1A3A1A" : "#3A1A1A", padding:"14px 18px", borderBottom:`2px solid ${isCorrect?"#3FB950":"#FF4444"}` }}>
+                <div style={{ color: isCorrect?"#3FB950":"#FF4444", fontSize:12, fontWeight:700 }}>{isCorrect ? "✓ CORRECT" : "✗ INCORRECT"}</div>
+                <div style={{ color:"#fff", fontWeight:700, fontSize:14, marginTop:2 }}>{isCorrect ? "Excellent Counseling!" : "Review Required"}</div>
+              </div>
+              <div style={{ padding:"18px" }}>
+                <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:6, padding:"12px 14px", marginBottom:16, borderLeft:`3px solid ${isCorrect?"#3FB950":"#FFB800"}` }}>
+                  <div style={{ color:isCorrect?"#3FB950":"#FFB800", fontSize:10, fontWeight:700, letterSpacing:1, marginBottom:6 }}>PHARMACIST TIP</div>
+                  <div style={{ color:"#E8EDF1", fontSize:12, lineHeight:1.7 }}>{script.tip}</div>
+                </div>
+                {BTN(isCorrect ? "COMPLETE COUNSELING → +10 XP" : "CONTINUE WITHOUT BONUS", () => resolveCounseling(counselingModal, answered), isCorrect?"#3FB950":"#CC0000")}
+              </div>
+            </div></div>
+          );
+        }
+
+        if (answered === "question") return (
+          <div style={OV}><div style={CD}>
+            {HDR("COUNSELING ASSESSMENT", "RXCONNECT · PATIENT COUNSELING")}
+            <div style={{ padding:"18px" }}>
+              <div style={{ color:"#FFB800", fontSize:10, fontWeight:700, letterSpacing:1, marginBottom:8 }}>{rx.drug.toUpperCase()} — {script.indication.toUpperCase()}</div>
+              <div style={{ color:"#E8EDF1", fontSize:13, lineHeight:1.6, marginBottom:16, fontWeight:600 }}>{script.question}</div>
+              {script.options.map((opt, i) => (
+                <button key={i} onClick={() => setCounselingModal(m => ({ ...m, answered: i === script.answer ? "correct" : "wrong" }))}
+                  style={{ display:"block", width:"100%", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:6, padding:"10px 14px", color:"#E8EDF1", fontSize:12, cursor:"pointer", textAlign:"left", marginBottom:8, ...TM }}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div></div>
+        );
+
+        return (
+          <div style={OV}><div style={CD}>
+            {HDR("NEW THERAPY COUNSELING REQUIRED", "RXCONNECT · VIRGINIA LAW §54.1-3319")}
+            <div style={{ padding:"18px" }}>
+              <div style={{ display:"flex", gap:10, marginBottom:14, flexWrap:"wrap" }}>
+                <div style={{ flex:1, background:"rgba(255,255,255,0.05)", borderRadius:6, padding:"10px 12px" }}>
+                  <div style={{ color:"rgba(255,255,255,0.5)", fontSize:9, letterSpacing:1 }}>PATIENT</div>
+                  <div style={{ color:"#fff", fontSize:13, fontWeight:700 }}>{rx.patient}</div>
+                </div>
+                <div style={{ flex:1, background:"rgba(255,255,255,0.05)", borderRadius:6, padding:"10px 12px" }}>
+                  <div style={{ color:"rgba(255,255,255,0.5)", fontSize:9, letterSpacing:1 }}>DRUG</div>
+                  <div style={{ color:"#FFB800", fontSize:13, fontWeight:700 }}>{rx.drug}</div>
+                </div>
+                <div style={{ flex:1, background:"rgba(255,255,255,0.05)", borderRadius:6, padding:"10px 12px" }}>
+                  <div style={{ color:"rgba(255,255,255,0.5)", fontSize:9, letterSpacing:1 }}>INDICATION</div>
+                  <div style={{ color:"#E8EDF1", fontSize:12, fontWeight:600 }}>{script.indication}</div>
+                </div>
+              </div>
+              <div style={{ background:"rgba(204,0,0,0.12)", border:"1px solid rgba(204,0,0,0.3)", borderRadius:6, padding:"10px 14px", marginBottom:18, fontSize:11, color:"#E8EDF1", lineHeight:1.6 }}>
+                This is <strong style={{ color:"#FF4444" }}>{rx.patient.split(" ")[0]}'s FIRST FILL</strong> of this therapy. Virginia law requires offering pharmacist counseling before dispensing.
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {BTN("COUNSEL PATIENT  →  +10 XP if answered correctly", () => setCounselingModal(m => ({ ...m, answered:"question" })))}
+                {BTN("Patient declined — Document refusal  (+2 XP)", () => setCounselingModal(m => ({ ...m, answered:"refused" })), "transparent", "rgba(255,255,255,0.55)", "1px solid rgba(255,255,255,0.18)")}
+              </div>
+            </div>
+          </div></div>
+        );
+      })()}
       {/* ── CVS SHIFT HEADER ── */}
       <div style={{ background: "#CC0000", borderRadius: "10px 10px 0 0", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div>
