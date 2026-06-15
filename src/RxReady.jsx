@@ -4609,9 +4609,10 @@ function getPatientCopay(plan, drug) {
 
 function managerRxFromFillCase(c, i, level = 4) {
   const lanes = ["Drive-thru", "Counter", "Waiter", "Phone"];
+  const noTimer = level <= 2;
   const baseByLevel = [0, 90000, 65000, 45000, 28000][level] ?? 45000;
   const spread = ((i * 11000) % 26000);
-  const patienceMs = baseByLevel + spread;
+  const patienceMs = noTimer ? 99999999 : baseByLevel + spread;
   const rxNum = String(Math.floor(1000000 + ((i * 912347 + 5483921) % 8999999)));
   const qv1Error = generateQv1Error(c.rx.drug, c.rx.strength, c.rx.qty, c.rx.sig, i);
   const plan = CVS_PLANS[i % CVS_PLANS.length];
@@ -4621,6 +4622,40 @@ function managerRxFromFillCase(c, i, level = 4) {
   const memberId = getMemberId(plan, patientSeed + i * 37);
   const minClinic = (i % 7 === 3);
   const srcLabel = minClinic ? "MinuteClinic eRx" : SCRIPT_TYPES[i % SCRIPT_TYPES.length];
+
+  // Refill / adherence data
+  const lastFillDays = csSchedule === "CII" ? null : [null, 38, 16, 82, 27, 5, 44, 62, 9, 31][(patientSeed + i) % 10];
+  const refillsLeft = [0,0,1,2,3,5,5,11,11,11][(patientSeed + i * 3) % 10];
+  const isFirstFill = lastFillDays === null && !csSchedule;
+  const tooSoon = lastFillDays !== null && lastFillDays < 25;
+
+  // PA status for specialty drugs
+  const d = (c.rx.drug || "").toLowerCase();
+  const needsPa = d.includes("semaglutide")||d.includes("tirzepatide")||d.includes("apixaban")||d.includes("empagliflozin")||d.includes("dupixent");
+  const paOnFile = needsPa && (patientSeed % 3 !== 0);
+  const paExpYear = 2026 + (patientSeed % 2);
+  const paStatus = needsPa ? (paOnFile ? `PA ON FILE — Exp 12/31/${paExpYear}` : "PA REQUIRED") : null;
+
+  // Written date and expiration
+  const writtenDate = (() => {
+    const d = new Date(); d.setDate(d.getDate() - ((patientSeed * 7 + i * 3) % 90));
+    return d.toLocaleDateString("en-US", { month:"2-digit", day:"2-digit", year:"numeric" });
+  })();
+  const scriptExpDate = (() => {
+    const base = new Date(writtenDate);
+    const months = csSchedule === "CII" ? 0 : csSchedule ? 6 : 12;
+    base.setMonth(base.getMonth() + (months || 12));
+    return base.toLocaleDateString("en-US", { month:"2-digit", day:"2-digit", year:"numeric" });
+  })();
+
+  // Patient phone
+  const areaCode = ["804", "757", "540", "703"][(patientSeed) % 4];
+  const patientPhone = `(${areaCode}) ${String(555).padStart(3,"0")}-${String(patientSeed % 9000 + 1000)}`;
+
+  // Generic sub opportunity (brand-name scripts where generic exists)
+  const brandInName = c.rx.drug.includes("(") || ["lipitor","crestor","zocor","norvasc","prinivil","zestril","glucophage","toprol"].some(b => d.includes(b));
+  const genericSub = brandInName ? { brand: c.rx.drug, saving: [15,25,35,50,75][(patientSeed * i) % 5] } : null;
+
   return {
     id: `manager-${i}-${c.rx.patient}-${c.rx.drug}`,
     patient: c.rx.patient,
@@ -4630,6 +4665,7 @@ function managerRxFromFillCase(c, i, level = 4) {
     sig: c.rx.sig,
     lane: lanes[i % lanes.length],
     patienceMs,
+    noTimer,
     patienceStartedAt: Date.now(),
     deEscalated: false,
     fillCase: c,
@@ -4642,6 +4678,15 @@ function managerRxFromFillCase(c, i, level = 4) {
     csSchedule,
     qv1Error,
     daw: csSchedule === "CII" ? "1" : "0",
+    lastFillDays,
+    refillsLeft,
+    isFirstFill,
+    tooSoon,
+    paStatus,
+    writtenDate,
+    scriptExpDate,
+    patientPhone,
+    genericSub,
   };
 }
 
@@ -5221,6 +5266,15 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   }
 
   const PressureMeter = ({ rx }) => {
+    const TM2 = { fontFamily: "'Spline Sans Mono',monospace" };
+    if (rx.noTimer) {
+      return (
+        <div style={{ marginTop: 7, ...TM2, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 8 }}>
+          <span style={{ color: "#4A8FA5" }}>{rx.lane?.toUpperCase()}{rx.deEscalated ? " ✓ RECOVERED" : ""}</span>
+          <span style={{ color: "#3FB950", background: "rgba(63,185,80,0.08)", borderRadius: 4, padding: "2px 7px", fontWeight: 700 }}>✓ PRACTICE MODE</span>
+        </div>
+      );
+    }
     const left = patientLeftMs(rx);
     const pct = Math.max(0, Math.min(100, (left / rx.patienceMs) * 100));
     const hot = pct <= 28;
@@ -5231,11 +5285,8 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     })();
     return (
       <div style={{ marginTop: 7 }}>
-        <div style={{ fontFamily: "'Spline Sans Mono',monospace", display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9, color: hot ? "#FF4444" : "#8A9AAA" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            {rx.scriptType && <span style={{ background: rx.scriptType === "eRx" ? "rgba(63,185,80,0.15)" : rx.scriptType === "FAX" ? "rgba(126,184,201,0.15)" : "rgba(255,184,0,0.15)", color: rx.scriptType === "eRx" ? "#3FB950" : rx.scriptType === "FAX" ? "#7EB8C9" : "#FFB800", borderRadius: 3, padding: "1px 4px", fontSize: 7, fontWeight: 700, letterSpacing: 0.5 }}>{rx.scriptType}</span>}
-            <span>{rx.lane?.toUpperCase()}{rx.deEscalated ? " ✓ RECOVERED" : ""}</span>
-          </span>
+        <div style={{ ...TM2, display: "flex", justifyContent: "space-between", gap: 8, fontSize: 9, color: hot ? "#FF4444" : "#8A9AAA" }}>
+          <span>{rx.lane?.toUpperCase()}{rx.deEscalated ? " ✓ RECOVERED" : ""}</span>
           <span style={{ color: left <= 0 ? "#FF4444" : hot ? "#FF4444" : "#8A9AAA" }}>
             {left <= 0 ? "PAST DUE" : `Promise ${promiseTime}`}
           </span>
@@ -5420,21 +5471,26 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
               const allergyRed = !allergy.startsWith("NKDA");
               return (
                 <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px dashed #E0E8EF" }}>
+                  {/* Patient + Prescriber */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 7 }}>
                     <div>
                       <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PATIENT</div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
                       <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>DOB: {dob}</div>
+                      {rx.patientPhone && <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{rx.patientPhone}</div>}
                     </div>
                     <div>
                       <div style={{ ...TM, fontSize: 7, color: "#4A8FA5", letterSpacing: 1, marginBottom: 2 }}>PRESCRIBER</div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "#0B1F3A" }}>{prescriber.name}</div>
-                      <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{prescriber.spec} · {prescriber.npi}</div>
+                      <div style={{ ...TM, fontSize: 9, color: "#5A7080" }}>{prescriber.spec}</div>
+                      <div style={{ ...TM, fontSize: 8, color: "#5A7080" }}>{prescriber.npi}</div>
                       {prescriber.dea && <div style={{ ...TM, fontSize: 8, color: "#FF4444", fontWeight: 700, marginTop: 1 }}>DEA: {prescriber.dea}</div>}
                       {prescriber.clinic && <div style={{ ...TM, fontSize: 8, color: "#CC0000", marginTop: 1 }}>{prescriber.clinic}</div>}
                     </div>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: rx.csSchedule ? 7 : 0 }}>
+
+                  {/* Allergies + Insurance */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 7 }}>
                     <div style={{ background: allergyRed ? "rgba(204,0,0,0.07)" : "rgba(63,185,80,0.06)", borderRadius: 6, padding: "5px 8px", border: `1px solid ${allergyRed ? "rgba(204,0,0,0.25)" : "rgba(63,185,80,0.2)"}` }}>
                       <div style={{ ...TM, fontSize: 6.5, color: allergyRed ? "#CC0000" : "#3FB950", letterSpacing: 1, marginBottom: 1 }}>ALLERGIES ON FILE</div>
                       <div style={{ ...TM, fontSize: 9, fontWeight: 700, color: allergyRed ? "#CC0000" : "#3FB950" }}>{allergy}</div>
@@ -5443,8 +5499,8 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                       <div style={{ background: "rgba(11,31,58,0.04)", borderRadius: 6, padding: "5px 8px", border: "1px solid rgba(11,31,58,0.1)" }}>
                         <div style={{ ...TM, fontSize: 6.5, color: "#4A8FA5", letterSpacing: 1, marginBottom: 1 }}>INSURANCE / NCPDP</div>
                         <div style={{ ...TM, fontSize: 8, fontWeight: 700, color: "#0B1F3A" }}>BIN {rx.plan.bin} · PCN {rx.plan.pcn}</div>
-                        <div style={{ ...TM, fontSize: 7.5, color: "#5A7080" }}>GRP {rx.plan.grp}</div>
-                        <div style={{ ...TM, fontSize: 7.5, color: "#5A7080" }}>ID: {rx.memberId || "—"}</div>
+                        <div style={{ ...TM, fontSize: 7.5, color: "#5A7080" }}>GRP {rx.plan.grp} · ID {rx.memberId || "—"}</div>
+                        {rx.copay != null && <div style={{ ...TM, fontSize: 8, color: "#3FB950", fontWeight: 700, marginTop: 1 }}>Co-pay: ${rx.copay}</div>}
                       </div>
                     ) : (
                       <div style={{ background: "rgba(0,0,0,0.04)", borderRadius: 6, padding: "5px 8px", border: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center" }}>
@@ -5452,10 +5508,48 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                       </div>
                     )}
                   </div>
+
+                  {/* Refill history + written date */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 7 }}>
+                    <div style={{ background: rx.tooSoon ? "rgba(255,68,68,0.07)" : "rgba(11,31,58,0.03)", borderRadius: 6, padding: "5px 8px", border: `1px solid ${rx.tooSoon ? "rgba(255,68,68,0.3)" : "rgba(0,0,0,0.08)"}` }}>
+                      <div style={{ ...TM, fontSize: 6.5, color: rx.tooSoon ? "#FF4444" : "#4A8FA5", letterSpacing: 1, marginBottom: 1 }}>
+                        {rx.tooSoon ? "⚠ REFILL TOO SOON" : "REFILL HISTORY"}
+                      </div>
+                      <div style={{ ...TM, fontSize: 8.5, fontWeight: 700, color: rx.tooSoon ? "#FF4444" : "#0B1F3A" }}>
+                        {rx.isFirstFill ? "FIRST FILL — New patient" : rx.lastFillDays != null ? `Last filled: ${rx.lastFillDays} days ago` : "CII — No refill history"}
+                      </div>
+                      {rx.refillsLeft != null && <div style={{ ...TM, fontSize: 7.5, color: "#5A7080", marginTop: 1 }}>Refills remaining: {rx.refillsLeft}</div>}
+                    </div>
+                    <div style={{ background: "rgba(11,31,58,0.03)", borderRadius: 6, padding: "5px 8px", border: "1px solid rgba(0,0,0,0.08)" }}>
+                      <div style={{ ...TM, fontSize: 6.5, color: "#4A8FA5", letterSpacing: 1, marginBottom: 1 }}>SCRIPT DATES</div>
+                      <div style={{ ...TM, fontSize: 8, color: "#0B1F3A" }}>Written: {rx.writtenDate || scriptWrittenDate}</div>
+                      <div style={{ ...TM, fontSize: 8, color: "#5A7080", marginTop: 1 }}>Expires: {rx.scriptExpDate || "—"}</div>
+                    </div>
+                  </div>
+
+                  {/* CS warning */}
                   {rx.csSchedule && (
-                    <div style={{ background: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.35)", borderRadius: 6, padding: "6px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ background: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.35)", borderRadius: 6, padding: "6px 10px", display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
                       <span style={{ ...TM, fontSize: 11, fontWeight: 900, color: "#FF4444" }}>{rx.csSchedule}</span>
-                      <span style={{ ...TM, fontSize: 8, color: "#CC2222" }}>CONTROLLED — Verify DEA · Written Rx required for CII · Log required</span>
+                      <span style={{ ...TM, fontSize: 8, color: "#CC2222" }}>
+                        {rx.csSchedule === "CII" ? "SCHEDULE II — Written Rx only. No verbal/fax. No refills. DEA log required." : "CONTROLLED — Verify prescriber DEA. Log required."}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* PA status */}
+                  {rx.paStatus && (
+                    <div style={{ background: rx.paStatus.startsWith("PA ON FILE") ? "rgba(63,185,80,0.07)" : "rgba(255,184,0,0.1)", border: `1px solid ${rx.paStatus.startsWith("PA ON FILE") ? "rgba(63,185,80,0.25)" : "rgba(255,184,0,0.4)"}`, borderRadius: 6, padding: "5px 10px", marginBottom: 7 }}>
+                      <div style={{ ...TM, fontSize: 6.5, color: rx.paStatus.startsWith("PA ON FILE") ? "#3FB950" : "#CC8800", letterSpacing: 1, marginBottom: 1 }}>PRIOR AUTHORIZATION</div>
+                      <div style={{ ...TM, fontSize: 9, fontWeight: 700, color: rx.paStatus.startsWith("PA ON FILE") ? "#3FB950" : "#CC8800" }}>{rx.paStatus}</div>
+                    </div>
+                  )}
+
+                  {/* Generic sub opportunity */}
+                  {rx.genericSub && (
+                    <div style={{ background: "rgba(126,184,201,0.1)", border: "1px solid rgba(126,184,201,0.3)", borderRadius: 6, padding: "5px 10px" }}>
+                      <div style={{ ...TM, fontSize: 6.5, color: "#4A8FA5", letterSpacing: 1, marginBottom: 1 }}>GENERIC SUBSTITUTION AVAILABLE</div>
+                      <div style={{ ...TM, fontSize: 8.5, color: "#0B1F3A" }}>Generic available — saves patient <span style={{ fontWeight: 700, color: "#3FB950" }}>${rx.genericSub.saving}</span>. DAW-0 allows substitution unless patient requests brand.</div>
                     </div>
                   )}
                 </div>
