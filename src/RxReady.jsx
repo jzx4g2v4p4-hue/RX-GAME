@@ -4687,6 +4687,7 @@ function managerRxFromFillCase(c, i, level = 4) {
     scriptExpDate,
     patientPhone,
     genericSub,
+    promisedAt: noTimer ? null : Date.now() + ([0, 45, 35, 25, 20, 15][level] ?? 20) * 60000,
   };
 }
 
@@ -4782,6 +4783,167 @@ function getCounselingScript(drug) {
     answer: 0,
     tip: "Virginia law and CVS policy require pharmacist counseling to be offered on all new prescriptions. Document if patient declines.",
   };
+}
+
+/* ============================================================
+   TECH ESCALATIONS — bench interrupts requiring RPh decision
+   ============================================================ */
+const TECH_ESCALATIONS = [
+  {
+    id: "partial_fill",
+    tag: "INVENTORY",
+    tech: "Maria",
+    message: "We only have 47 atorvastatin 40mg on the shelf. The patient waiting needs the full #90 — they say they leave on a 3-month trip tomorrow.",
+    options: [
+      { label: "Partial fill — dispense 47 today, give balance-owe note", ok: true,  xp: 8, svc: 4,  feedback: "Correct. Document the partial fill and issue a balance-owed note with the expected replenish date. This is standard CVS procedure." },
+      { label: "Transfer the Rx to a CVS with full stock", ok: false, xp: 2, svc: 0,  feedback: "Possible but slow for a waiter. Partial fill is faster and the balance can follow by mail order or when stock arrives." },
+      { label: "Ask them to come back tomorrow when stock arrives", ok: false, xp: 0, svc: -6, feedback: "Don't send a waiter away empty-handed. Partial fill with a balance-owe protects the patient and your service score." },
+    ]
+  },
+  {
+    id: "lost_controlled",
+    tag: "CONTROLLED SUBSTANCE",
+    tech: "Marcus",
+    message: "Patient at the window wants their Xanax 1mg #60 refilled early — they say they lost them at the beach. Last filled 12 days ago.",
+    options: [
+      { label: "Explain lost C-IV meds cannot be replaced early — have them call their prescriber", ok: true,  xp: 10, svc: 3,  feedback: "Correct. There is no emergency provision for lost/stolen scheduled medications without prescriber authorization. Document the claim and direct the patient to their doctor." },
+      { label: "Dispense a partial 15-tablet emergency supply", ok: false, xp: 0,  svc: -8, feedback: "Incorrect. Emergency dispensing provisions do not apply to lost controlled substances. This would be a dispensing violation." },
+      { label: "Refuse and have them escorted out", ok: false, xp: 0,  svc: -10, feedback: "Disproportionate. Explain the policy calmly and direct to their prescriber. Document the interaction." },
+    ]
+  },
+  {
+    id: "fridge_alarm",
+    tag: "STORAGE — ALERT",
+    tech: "Priya",
+    message: "The pharmacy refrigerator alarm went off — current temp reads 44°F (8.9°C). Lantus, Humira, flu vaccines, and COVID mVax are inside.",
+    options: [
+      { label: "Log the excursion, quarantine to backup fridge, call facilities and DM, contact manufacturers", ok: true,  xp: 10, svc: 4,  feedback: "Correct. USP requires 36–46°F (2–8°C). At 8.9°C it's above range. Quarantine, log the excursion, contact manufacturers for stability guidance before dispensing anything." },
+      { label: "It's close enough — reset the alarm and monitor it", ok: false, xp: 0,  svc: -8, feedback: "Incorrect. Any excursion above 8°C must be logged and reported. Dispensing unverified refrigerated product is a patient safety violation." },
+      { label: "Discard all refrigerated medications immediately", ok: false, xp: 2,  svc: 0,  feedback: "Don't discard yet — contact manufacturers first. Many products tolerate brief excursions. Quarantine and consult before destroying thousands of dollars of product." },
+    ]
+  },
+  {
+    id: "wrong_formulation",
+    tag: "INVENTORY",
+    tech: "Carlos",
+    message: "Out of metoprolol succinate 25mg ER (Toprol XL). Patient is waiting. We have metoprolol tartrate 25mg IR on the shelf.",
+    options: [
+      { label: "They are NOT interchangeable — call the prescriber for an alternative", ok: true,  xp: 10, svc: 3,  feedback: "Correct. Succinate (ER, once daily) and tartrate (IR, twice daily) have different dosing and pharmacokinetics. Substituting without authorization is an error that could harm cardiac patients." },
+      { label: "Dispense the tartrate — same drug, same dose", ok: false, xp: 0,  svc: -10, feedback: "Incorrect. These are different formulations with different dosing regimens. Substituting without prescriber authorization is a dispensing error." },
+      { label: "Transfer the prescription to another CVS that has succinate", ok: false, xp: 4,  svc: 1,  feedback: "Acceptable last resort, but call the prescriber first — they may want to switch to a different available agent. Transfer is secondary to a prescriber consult." },
+    ]
+  },
+  {
+    id: "hipaa_pickup",
+    tag: "HIPAA",
+    tech: "Keisha",
+    message: "A man says he's picking up his wife's Zoloft. No ID, but he knows her DOB. No designee note on file.",
+    options: [
+      { label: "Verify DOB — if confirmed, use professional judgment or call the wife for verbal authorization", ok: true,  xp: 8,  svc: 4,  feedback: "Correct. HIPAA allows pharmacist professional judgment for family pickups. DOB verification + a quick call to the patient for verbal confirmation is best practice." },
+      { label: "Refuse — only the patient can pick up", ok: false, xp: 0,  svc: -4, feedback: "Sertraline is not a controlled substance. Refusing family pickup when DOB matches is overly rigid and harms the patient's access to their medication." },
+      { label: "Dispense without any verification", ok: false, xp: 2,  svc: -2, feedback: "Always verify DOB at minimum. HIPAA still applies — verification protects the patient's privacy and the pharmacy legally." },
+    ]
+  },
+  {
+    id: "compound_request",
+    tag: "COMPOUND",
+    tech: "Jordan",
+    message: "Fax came in: 'Ketamine 10% / Gabapentin 6% / Lidocaine 2% topical cream, 100g, apply TID.' Patient in will-call asking if it's ready.",
+    options: [
+      { label: "Explain we don't compound — call the prescriber's office and refer to a compounding pharmacy", ok: true,  xp: 8,  svc: 3,  feedback: "Correct. CVS retail pharmacies are not licensed compounding facilities. Call the prescriber's office directly (not the patient) and provide a local compounding pharmacy referral." },
+      { label: "Fill it — it's just a topical", ok: false, xp: 0,  svc: -10, feedback: "Incorrect. Preparing compounds without a compounding license is a federal and state board violation regardless of how simple the compound is." },
+      { label: "Tell the patient to take the fax to a compounding pharmacy", ok: false, xp: 2,  svc: -2, feedback: "The prescriber initiated the fax — call them, not the patient. The office needs to redirect the order. It's also more professional." },
+    ]
+  },
+  {
+    id: "vaccine_opportunity",
+    tag: "CLINICAL OPPORTUNITY",
+    tech: "Tanya",
+    message: "Patient (age 67, immunocompromised flag) picking up lisinopril asks 'Is there anything else I should know?' No flu shot on record this season.",
+    options: [
+      { label: "Recommend flu + pneumococcal vaccines and offer to administer both today", ok: true,  xp: 10, svc: 5,  feedback: "Excellent. A 67-year-old immunocompromised patient is high priority for flu (annual) and pneumococcal vaccine (PCV20). This is a billable CVS service that genuinely improves patient outcomes." },
+      { label: "Counsel on the lisinopril and move on", ok: false, xp: 2,  svc: 0,  feedback: "Missed clinical opportunity. CVS pharmacists are expected to proactively recommend vaccines to high-risk patients — it's a measured quality metric." },
+      { label: "Tell them to ask their PCP about vaccines", ok: false, xp: 1,  svc: -1, feedback: "You can provide this service right now. Deflecting to the PCP reduces access for a patient who may not see their doctor frequently." },
+    ]
+  },
+  {
+    id: "celecoxib_sulfa",
+    tag: "DRUG-ALLERGY CHECK",
+    tech: "Alex",
+    message: "Prescriber called in: Celebrex 200mg BID #60. Patient profile shows SULFA ALLERGY. Celecoxib contains a sulfonamide moiety.",
+    options: [
+      { label: "Hold the fill — call the prescriber to confirm they're aware of the sulfa allergy", ok: true,  xp: 10, svc: 3,  feedback: "Correct. Celecoxib has a sulfonamide group. Cross-reactivity is debated but real. With a documented sulfa allergy, a prescriber call to confirm appropriateness is required before dispensing." },
+      { label: "Dispense — celecoxib cross-reactivity with sulfa antibiotics is very low", ok: false, xp: 2,  svc: -2, feedback: "Technically defensible but not best practice. The cross-reactivity risk is non-zero with a documented allergy. A prescriber call protects the patient and you legally." },
+      { label: "Dispense — sulfa allergy only applies to antibiotics", ok: false, xp: 0,  svc: -8, feedback: "Incorrect. Sulfa allergy can extend to non-antibiotic sulfonamides including celecoxib, furosemide, and hydrochlorothiazide. Always flag and call." },
+    ]
+  },
+  {
+    id: "emergency_insulin",
+    tag: "EMERGENCY DISPENSING",
+    tech: "Nia",
+    message: "Patient is out of insulin glargine, no refills, prescriber office is closed. They haven't taken their Lantus in 2 days and say their sugar is 'very high.'",
+    options: [
+      { label: "Dispense a 72-hour emergency supply under Virginia emergency dispensing law — document and attempt prescriber contact", ok: true,  xp: 10, svc: 5,  feedback: "Correct. Virginia Code §54.1-3408(H) authorizes a 72-hour emergency supply for maintenance medications when the prescriber is unreachable and a delay would harm the patient. Document everything and follow up within 72 hours." },
+      { label: "Refuse — no valid prescription, no dispense", ok: false, xp: 0,  svc: -10, feedback: "A Type 1 diabetic without insulin is a life-threatening emergency. Virginia emergency dispensing law exists precisely for this scenario. Refusing could cause DKA — a patient safety failure." },
+      { label: "Call 911 immediately", ok: false, xp: 2,  svc: 0,  feedback: "Only if the patient is showing signs of active DKA (altered consciousness, severe distress). Dispense the emergency supply first — that resolves the immediate crisis." },
+    ]
+  },
+  {
+    id: "cii_fax",
+    tag: "CONTROLLED SUBSTANCE",
+    tech: "Ramon",
+    message: "We received a faxed prescription for oxycodone 10mg #60. Patient is at the window asking if it's ready.",
+    options: [
+      { label: "Reject the fax — CII requires written or EPCS. Ask patient to present the original.", ok: true,  xp: 10, svc: 2,  feedback: "Correct. Schedule II controlled substances cannot be dispensed from a fax except in narrow exemptions (hospice, LTCF emergency). The patient must present a written hard copy or an EPCS-transmitted prescription." },
+      { label: "Fill it — faxes are accepted for all prescriptions", ok: false, xp: 0,  svc: -10, feedback: "Incorrect. CII prescriptions require a hand-signed written Rx or EPCS. A fax is not valid for Schedule II dispensing in Virginia outside narrow exemptions." },
+      { label: "Call the prescriber to verify verbally, then fill from the fax", ok: false, xp: 3,  svc: -2, feedback: "Verification is good but a phone call doesn't make the fax a valid dispensing document for CII. You still need the original or EPCS Rx before dispensing." },
+    ]
+  },
+  {
+    id: "cii_count",
+    tag: "CII COUNT — DISCREPANCY",
+    tech: "Simone",
+    message: "End-of-day CII count: log shows 42 oxycodone 5mg on hand. Physical count shows 39. Discrepancy of 3 tablets.",
+    options: [
+      { label: "Recount, document in the CII log, notify the pharmacy manager, initiate loss/theft investigation", ok: true,  xp: 12, svc: 4,  feedback: "Correct. Recount to rule out counting error. If confirmed, document immediately, notify your DM, and file a DEA-106 if theft is suspected. Never adjust the log without documentation." },
+      { label: "Adjust the log count to match physical and move on", ok: false, xp: 0,  svc: -10, feedback: "Absolutely not. Falsifying a CII controlled substance log is a federal crime and DEA violation. This can end your pharmacist license and result in criminal charges." },
+      { label: "Assume it was a counting error and don't document", ok: false, xp: 0,  svc: -8, feedback: "Incorrect. Any CII discrepancy must be formally documented regardless of suspected cause. Undocumented discrepancies create serious legal exposure during DEA audits." },
+    ]
+  },
+  {
+    id: "auto_refill",
+    tag: "PATIENT SERVICES",
+    tech: "Devon",
+    message: "Regular patient on their 4th lisinopril fill mentioned they always forget to call ahead and end up waiting. CarePass member.",
+    options: [
+      { label: "Offer to enroll in CVS auto-refill and mention free CarePass delivery", ok: true,  xp: 8,  svc: 5,  feedback: "Perfect. Auto-refill eliminates refill requests, reduces wait times, improves adherence, and free delivery (a CarePass benefit) makes it even more compelling. This is a tracked CVS patient retention metric." },
+      { label: "Tell them to call ahead next time", ok: false, xp: 1,  svc: 0,  feedback: "Reactive advice. Auto-refill is the proactive solution that solves the problem permanently and is a tracked CVS quality metric." },
+      { label: "Nothing — the fill is complete", ok: false, xp: 0,  svc: -2, feedback: "Missed retention opportunity. An enrollment offer takes 30 seconds and significantly improves this patient's adherence and experience." },
+    ]
+  },
+];
+
+function generatePdmpHistory(rx) {
+  const seed = (rx.patient || "").split("").reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const presc = prescriberFor(rx.drug, rx.scriptType);
+  const PHARMS = ["CVS #4821 · Richmond VA", "Walgreens #892 · Henrico VA", "CVS #4833 · Chesterfield VA", "Rite Aid #7021 · Richmond VA"];
+  const today = new Date();
+  const fmt = (d) => d.toLocaleDateString("en-US", { month:"2-digit", day:"2-digit", year:"numeric" });
+  if (rx.tooSoon) {
+    const d1 = new Date(today); d1.setDate(d1.getDate() - (rx.lastFillDays || 10));
+    const d2 = new Date(today); d2.setDate(d2.getDate() - 38);
+    const d3 = new Date(today); d3.setDate(d3.getDate() - 68);
+    return [
+      { date: fmt(d1), drug: rx.drug, qty: rx.qty, days: 30, prescriber: presc.name, pharmacy: PHARMS[seed % 4] },
+      { date: fmt(d2), drug: rx.drug, qty: rx.qty, days: 30, prescriber: presc.name, pharmacy: PHARMS[(seed + 1) % 4] },
+      { date: fmt(d3), drug: rx.drug, qty: rx.qty, days: 30, prescriber: presc.name, pharmacy: PHARMS[(seed + 2) % 4] },
+    ];
+  }
+  const intervals = [31, 62, 94];
+  return intervals.map((back) => {
+    const d = new Date(today); d.setDate(d.getDate() - back);
+    return { date: fmt(d), drug: rx.drug, qty: rx.qty, days: 30, prescriber: presc.name, pharmacy: PHARMS[0] };
+  });
 }
 
 function isSevereFillError(rx) {
@@ -5151,11 +5313,15 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   const [chainToast, setChainToast] = useState(null);
   const [verifyModal, setVerifyModal] = useState(null);
   const [counselingModal, setCounselingModal] = useState(null);
+  const [techAlert, setTechAlert] = useState(null);
+  const [techAlertPicked, setTechAlertPicked] = useState(null);
   const timers = useRef({});
   const pendingSummaryRef = useRef(null);
   const bellPenaltyRef = useRef(0);
   const malpracticeTimerRef = useRef(null);
   const chainToastRef = useRef(null);
+  const techAlertTimerRef = useRef(null);
+  const techAlertActiveRef = useRef(false);
   const qv1CaughtRef = useRef(0);
   const bell = useDriveThruBell(!auditOpen);
 
@@ -5311,6 +5477,35 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
     }, 9000);
     return () => window.clearInterval(interval);
   }, [auditOpen, shiftReport, chainLoad]);
+
+  useEffect(() => {
+    if (auditOpen || shiftReport) return undefined;
+    function scheduleTechAlert() {
+      techAlertTimerRef.current = window.setTimeout(() => {
+        if (!techAlertActiveRef.current) {
+          const esc = TECH_ESCALATIONS[Math.floor(Math.random() * TECH_ESCALATIONS.length)];
+          techAlertActiveRef.current = true;
+          setTechAlert(esc);
+          setTechAlertPicked(null);
+        }
+        scheduleTechAlert();
+      }, 28000 + Math.random() * 27000); // 28-55 sec between alerts
+    }
+    const initial = window.setTimeout(scheduleTechAlert, 18000 + Math.random() * 15000); // first: 18-33 sec in
+    return () => { window.clearTimeout(initial); window.clearTimeout(techAlertTimerRef.current); };
+  }, [auditOpen, shiftReport]);
+
+  function dismissTechAlert(opt) {
+    setTechAlertPicked(opt);
+    if (opt) {
+      addShiftXp(opt.xp, opt.svc, opt.ok ? `Tech handled! +${opt.xp} XP` : "Bench call miss — service hit");
+    }
+  }
+  function closeTechAlert() {
+    techAlertActiveRef.current = false;
+    setTechAlert(null);
+    setTechAlertPicked(null);
+  }
 
   function approveData(rx, qv1Correct = true) {
     if (meltdown || auditOpen) return;
@@ -5579,6 +5774,64 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
           ))}
         </div>
       );
+
+      if (qv1Phase === "pdmp") {
+        const pdmpRows = generatePdmpHistory(rx);
+        const suspicious = rx.tooSoon;
+        return (
+          <ModalWrap>
+            <ModalHeader title="PDMP LOOKUP" sub={`VA PDMP — ${rx.csSchedule} CONTROLLED SUBSTANCE`} />
+            <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+              <div style={{ background: "#0B2A3F", padding: "6px 12px", display:"flex", justifyContent:"space-between" }}>
+                <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>PRESCRIPTION DRUG MONITORING — LAST 12 MONTHS</span>
+                <span style={{ ...TM, color: "rgba(126,184,201,0.5)", fontSize: 8 }}>VA PDMP</span>
+              </div>
+              <div style={{ padding: "10px 14px 6px" }}>
+                <div style={{ display:"flex", gap:12, marginBottom:10, flexWrap:"wrap" }}>
+                  <div><div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>PATIENT</div><div style={{ ...TM, fontSize:11, fontWeight:700, color:"#0B1F3A" }}>{rx.patient}</div></div>
+                  <div><div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>DOB</div><div style={{ ...TM, fontSize:11, fontWeight:700, color:"#0B1F3A" }}>{dob}</div></div>
+                  <div><div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>DRUG</div><div style={{ ...TM, fontSize:11, fontWeight:700, color:"#CC0000" }}>{rx.drug} — {rx.csSchedule}</div></div>
+                </div>
+                <div style={{ borderRadius:6, overflow:"hidden", border:"1px solid #D0D8E0", marginBottom: suspicious ? 10 : 0 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"72px 1fr 1fr 36px", background:"#0B1F3A" }}>
+                    {["DATE","DRUG","PHARMACY","DS"].map(h => (
+                      <div key={h} style={{ ...TM, fontSize:7, color:"#4A8FA5", padding:"4px 8px", letterSpacing:1 }}>{h}</div>
+                    ))}
+                  </div>
+                  {pdmpRows.map((row, i) => (
+                    <div key={i} style={{ display:"grid", gridTemplateColumns:"72px 1fr 1fr 36px", borderTop:"1px solid #EEF1F4", background: i%2===0?"#FFFFFF":"#F8FAFB" }}>
+                      <div style={{ ...TM, fontSize:9, color:"#3A5060", padding:"6px 8px" }}>{row.date}</div>
+                      <div style={{ ...TM, fontSize:9, fontWeight:600, color:"#0B1F3A", padding:"6px 8px", lineHeight:1.3 }}>{row.drug}</div>
+                      <div style={{ ...TM, fontSize:8, color:"#4A8FA5", padding:"6px 8px", lineHeight:1.3 }}>{row.pharmacy}</div>
+                      <div style={{ ...TM, fontSize:9, fontWeight:700, color:"#0B1F3A", padding:"6px 8px" }}>{row.days}d</div>
+                    </div>
+                  ))}
+                </div>
+                {suspicious && (
+                  <div style={{ background:"rgba(255,68,68,0.07)", border:"1px solid rgba(255,68,68,0.3)", borderRadius:6, padding:"8px 12px", marginBottom:4 }}>
+                    <div style={{ ...TM, fontSize:9, fontWeight:700, color:"#FF4444" }}>⚠ PDMP ALERT — EARLY FILL PATTERN</div>
+                    <div style={{ ...TM, fontSize:8.5, color:"#4A2020", marginTop:4, lineHeight:1.5 }}>
+                      Last fill: {rx.lastFillDays} days ago at a different pharmacy. Current refill is {25 - rx.lastFillDays} day(s) early relative to a 25-day minimum. Multiple fill locations on record.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ padding:"10px 12px 16px", display:"grid", gap:8 }}>
+              {suspicious && (
+                <button onClick={() => setVerifyModal(v => ({ ...v, qv1Phase:"review" }))}
+                  style={{ ...TM, padding:"12px 0", background:"rgba(255,68,68,0.08)", color:"#FF4444", border:"1px solid rgba(255,68,68,0.35)", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer" }}>
+                  ⚠ FLAG — CONTACT PRESCRIBER BEFORE FILLING
+                </button>
+              )}
+              <button onClick={() => setVerifyModal(v => ({ ...v, qv1Phase:"review" }))}
+                style={{ ...TM, padding:"13px 0", background:"#0B1F3A", color:suspicious?"rgba(255,255,255,0.6)":"#3FB950", border:"none", borderRadius:8, fontSize:suspicious?11:12, fontWeight:700, cursor:"pointer" }}>
+                {suspicious ? "CLEAR — PROCEED ANYWAY (override)" : "✓ PDMP CLEAR — PROCEED TO VERIFICATION"}
+              </button>
+            </div>
+          </ModalWrap>
+        );
+      }
 
       if (qv1Phase === "review") return (
         <ModalWrap>
@@ -6038,6 +6291,53 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
           </div></div>
         );
       })()}
+      {/* ── TECH ALERT MODAL ── */}
+      {techAlert && (() => {
+        const OV = { position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:9910, display:"flex", alignItems:"center", justifyContent:"center", padding:16 };
+        const CD = { background:"#0B1F3A", borderRadius:10, width:"100%", maxWidth:520, boxShadow:"0 8px 40px rgba(0,0,0,0.7)", overflow:"hidden", ...TM };
+        if (techAlertPicked) {
+          const correct = techAlertPicked.ok;
+          return (
+            <div style={OV}><div style={CD}>
+              <div style={{ background: correct?"#1A3A1A":"#3A1A1A", padding:"14px 18px", borderBottom:`2px solid ${correct?"#3FB950":"#FF4444"}` }}>
+                <div style={{ color:"rgba(255,255,255,0.5)", fontSize:8, letterSpacing:2 }}>TECH ALERT — {techAlert.tag}</div>
+                <div style={{ color: correct?"#3FB950":"#FF4444", fontSize:13, fontWeight:700, marginTop:3 }}>{correct?"✓ GOOD CALL":"✗ REVIEW REQUIRED"}</div>
+              </div>
+              <div style={{ padding:"18px" }}>
+                <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:6, padding:"12px 14px", marginBottom:16, borderLeft:`3px solid ${correct?"#3FB950":"#FFB800"}` }}>
+                  <div style={{ color:correct?"#3FB950":"#FFB800", fontSize:9, fontWeight:700, letterSpacing:1, marginBottom:6 }}>RATIONALE</div>
+                  <div style={{ color:"#E8EDF1", fontSize:12, lineHeight:1.7 }}>{techAlertPicked.feedback}</div>
+                </div>
+                <button onClick={closeTechAlert} style={{ display:"block", width:"100%", background:"#CC0000", color:"#fff", border:"none", borderRadius:6, padding:"13px 0", fontWeight:700, fontSize:13, cursor:"pointer", ...TM }}>
+                  BACK TO SHIFT
+                </button>
+              </div>
+            </div></div>
+          );
+        }
+        return (
+          <div style={OV}><div style={CD}>
+            <div style={{ background:"#CC0000", padding:"14px 18px" }}>
+              <div style={{ color:"rgba(255,255,255,0.65)", fontSize:9, letterSpacing:2, marginBottom:4 }}>RXCONNECT · BENCH ALERT — {techAlert.tag}</div>
+              <div style={{ color:"#fff", fontWeight:700, fontSize:15 }}>TECH: {techAlert.tech.toUpperCase()}</div>
+            </div>
+            <div style={{ padding:"18px" }}>
+              <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:6, padding:"14px", marginBottom:16, borderLeft:"3px solid #FFB800", lineHeight:1.7, color:"#E8EDF1", fontSize:13 }}>
+                "{techAlert.message}"
+              </div>
+              <div style={{ color:"rgba(255,255,255,0.45)", fontSize:9, letterSpacing:1, marginBottom:10 }}>SELECT YOUR RESPONSE</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {techAlert.options.map((opt, i) => (
+                  <button key={i} onClick={() => dismissTechAlert(opt)}
+                    style={{ display:"block", width:"100%", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)", borderRadius:6, padding:"11px 14px", color:"#E8EDF1", fontSize:12, cursor:"pointer", textAlign:"left", lineHeight:1.5, ...TM }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div></div>
+        );
+      })()}
       {/* ── CVS SHIFT HEADER ── */}
       <div style={{ background: "#CC0000", borderRadius: "10px 10px 0 0", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div>
@@ -6148,8 +6448,15 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                 <div style={{ ...TM, fontSize: 10, color: "#3A5060", marginTop: 1 }}>{rx.strength} · #{rx.qty}</div>
                 <div style={{ ...TM, fontSize: 9, color: "#8A9AAA", marginTop: 2, lineHeight: 1.3 }}>{rx.sig}</div>
                 <PressureMeter rx={rx} />
-                <button onClick={() => setVerifyModal({ rx, stage: "qv1", qv1Phase: "review", holdField: null })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: "#CC0000", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
-                  {rx.qv1Error ? "⚠ QV1 — REVIEW SCRIPT" : "QV1 — VERIFY ▶"}
+                {rx.promisedAt && (() => {
+                  const rem = rx.promisedAt - now;
+                  if (rem > 600000) return null;
+                  const late = rem <= 0;
+                  const mins = Math.max(0, Math.ceil(Math.abs(rem) / 60000));
+                  return <div style={{ ...TM, fontSize:8, fontWeight:700, color:late?"#FF4444":"#FFB800", marginTop:4 }}>{late?`⚠ ${mins}m PAST PROMISE TIME`:`⏱ ${mins}m to promise`}</div>;
+                })()}
+                <button onClick={() => setVerifyModal({ rx, stage: "qv1", qv1Phase: rx.csSchedule ? "pdmp" : "review", holdField: null })} style={{ ...TM, width: "100%", marginTop: 8, padding: "9px 0", background: "#CC0000", color: "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                  {rx.csSchedule ? `${rx.csSchedule} — QV1 ▶` : rx.qv1Error ? "⚠ QV1 — REVIEW SCRIPT" : "QV1 — VERIFY ▶"}
                 </button>
               </div>
             </div>
@@ -6198,7 +6505,14 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#1A2A35" }}>{rx.drug}</div>
                   <div style={{ ...TM, fontSize: 10, color: "#3A5060", marginTop: 1 }}>{rx.strength} · #{rx.qty}</div>
                   <PressureMeter rx={rx} />
-                  <button onClick={() => setVerifyModal({ rx, stage: "qv2" })} style={{ ...TM, width: "100%", marginTop: 9, padding: "9px 0", background: needsReject ? "#FFB800" : "#CC0000", color: needsReject ? "#3A2800" : "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
+                  {rx.promisedAt && (() => {
+                    const rem = rx.promisedAt - now;
+                    if (rem > 600000) return null;
+                    const late = rem <= 0;
+                    const mins = Math.max(0, Math.ceil(Math.abs(rem) / 60000));
+                    return <div style={{ ...TM, fontSize:8, fontWeight:700, color:late?"#FF4444":"#FFB800", marginTop:4 }}>{late?`⚠ ${mins}m PAST PROMISE TIME`:`⏱ ${mins}m to promise`}</div>;
+                  })()}
+                  <button onClick={() => setVerifyModal({ rx, stage: "qv2" })} style={{ ...TM, width: "100%", marginTop: 8, padding: "9px 0", background: needsReject ? "#FFB800" : "#CC0000", color: needsReject ? "#3A2800" : "#FFFFFF", border: "none", borderRadius: 7, fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: "pointer" }}>
                     {needsReject ? "⚠ QV2 — INSPECT FILL" : "QV2 — FINAL CHECK ▶"}
                   </button>
                 </div>
