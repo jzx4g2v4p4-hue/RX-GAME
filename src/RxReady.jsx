@@ -5764,20 +5764,120 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
       <ModalWrap>
         <ModalHeader title="FINAL VERIFICATION" sub="QV2 — RPh CHECK REQUIRED" />
 
+        {/* ── ORIGINAL PRESCRIPTION ── */}
         <div style={{ background: "#FFFFFF", margin: "12px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
-          <div style={{ background: "#0B2A3F", padding: "6px 12px" }}>
+          <div style={{ background: "#0B2A3F", padding: "6px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>ORIGINAL PRESCRIPTION</span>
+            <span style={{ ...TM, color: "rgba(126,184,201,0.55)", fontSize: 8 }}>Rx# {rx.rxNum}</span>
           </div>
+          {/* Metadata strip */}
+          <div style={{ background:"#F8FAFB", borderBottom:"1px solid #EEF1F4", padding:"6px 14px", display:"flex", gap:18, flexWrap:"wrap" }}>
+            {[
+              { k:"WRITTEN",  v: rx.writtenDate  },
+              { k:"EXPIRES",  v: rx.scriptExpDate },
+              { k:"VIA",      v: rx.scriptType    },
+              { k:"DAW",      v: `DAW-${rx.daw||"0"} — ${rx.daw==="1"?"No Sub":"Sub OK"}` },
+            ].map(({ k, v }) => (
+              <div key={k}>
+                <div style={{ ...TM, fontSize: 7, color:"#5A7080", letterSpacing:1 }}>{k}</div>
+                <div style={{ ...TM, fontSize: 9, color:"#0B1F3A", fontWeight:600 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {/* Patient + drug */}
           <div style={{ padding: "10px 14px" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#0B1F3A", marginTop: 4 }}>{rx.drug} <span style={{ fontWeight: 600, color: "#1A4060" }}>{rx.strength}</span></div>
-            <div style={{ display: "flex", gap: 20, marginTop: 6 }}>
-              <div><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>DISPENSE</span><span style={{ ...TM, fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>#{rx.qty}</span></div>
-              <div><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>DIRECTIONS</span><span style={{ ...TM, fontSize: 10, color: "#1A2A35" }}>{rx.sig}</span></div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", flexWrap:"wrap", gap:4 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0B1F3A" }}>{rx.patient}</div>
+              <div style={{ ...TM, fontSize: 9, color:"#5A7080" }}>DOB: {dob}</div>
             </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#0B1F3A", marginTop: 4 }}>{rx.drug} <span style={{ fontWeight: 600, color: "#1A4060" }}>{rx.strength}</span></div>
+            <div style={{ display: "grid", gridTemplateColumns:"repeat(4,auto)", justifyContent:"start", gap:"8px 20px", marginTop: 8 }}>
+              <div><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>DISPENSE</span><span style={{ ...TM, fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>#{rx.qty}</span></div>
+              <div><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>REFILLS LEFT</span><span style={{ ...TM, fontSize: 13, fontWeight: 700, color: "#0B1F3A" }}>{rx.refillsLeft ?? "—"}</span></div>
+              <div style={{ gridColumn:"span 2" }}><span style={{ ...TM, fontSize: 8, color: "#4A8FA5", display: "block", letterSpacing: 1 }}>DIRECTIONS</span><span style={{ ...TM, fontSize: 10, color: "#1A2A35" }}>{rx.sig}</span></div>
+            </div>
+          </div>
+          {/* Prescriber row */}
+          <div style={{ borderTop:"1px solid #EEF1F4", padding:"7px 14px", background:"#F8FAFB", display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+            <div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>PRESCRIBER</div>
+            <div style={{ ...TM, fontSize:10, color:"#0B1F3A", fontWeight:700 }}>{prescriber.name}</div>
+            <div style={{ ...TM, fontSize:9, color:"#4A8FA5" }}>{prescriber.spec}</div>
+            {prescriber.dea && <div style={{ ...TM, fontSize:8, color:"#7A4400", background:"rgba(255,184,0,0.12)", borderRadius:4, padding:"1px 6px" }}>DEA {prescriber.dea}</div>}
+            <div style={{ ...TM, fontSize:8, color:"rgba(90,112,128,0.7)", marginLeft:"auto" }}>{prescriber.npi}</div>
           </div>
         </div>
 
+        {/* ── SAFETY FLAGS ── */}
+        {(rx.csSchedule || rx.tooSoon || rx.paStatus || rx.isFirstFill) && (
+          <div style={{ margin:"6px 12px 0", display:"flex", flexDirection:"column", gap:5 }}>
+            {rx.csSchedule && (
+              <div style={{ background:"rgba(204,0,0,0.07)", border:"1px solid rgba(204,0,0,0.28)", borderRadius:6, padding:"8px 12px", display:"flex", gap:10, alignItems:"center" }}>
+                <span style={{ ...TM, color:"#CC0000", fontSize:10, fontWeight:700 }}>⚠ SCHEDULE {rx.csSchedule}</span>
+                <span style={{ ...TM, color:"#4A2020", fontSize:9 }}>Controlled Substance{rx.csSchedule==="CII"?" — Vault Required · No Refills":" — Max 5 Refills / 6 Months"}</span>
+              </div>
+            )}
+            {rx.tooSoon && (
+              <div style={{ background:"rgba(255,68,68,0.07)", border:"1px solid rgba(255,68,68,0.3)", borderRadius:6, padding:"8px 12px", display:"flex", gap:10, alignItems:"center" }}>
+                <span style={{ ...TM, color:"#FF4444", fontSize:10, fontWeight:700 }}>⚠ EARLY FILL</span>
+                <span style={{ ...TM, color:"#4A2020", fontSize:9 }}>Last fill: {rx.lastFillDays} days ago — minimum 25 days between fills. Verify patient need.</span>
+              </div>
+            )}
+            {rx.paStatus && (
+              <div style={{ background: rx.paStatus.startsWith("PA ON") ? "rgba(63,185,80,0.07)" : "rgba(255,184,0,0.1)", border:`1px solid ${rx.paStatus.startsWith("PA ON")?"rgba(63,185,80,0.28)":"rgba(255,184,0,0.35)"}`, borderRadius:6, padding:"8px 12px", display:"flex", gap:10, alignItems:"center" }}>
+                <span style={{ ...TM, color: rx.paStatus.startsWith("PA ON")?"#3FB950":"#FFB800", fontSize:10, fontWeight:700 }}>{rx.paStatus.startsWith("PA ON")?"✓":"⚠"} {rx.paStatus}</span>
+                <span style={{ ...TM, color:"#5A7080", fontSize:9 }}>— Prior Authorization</span>
+              </div>
+            )}
+            {rx.isFirstFill && (
+              <div style={{ background:"rgba(63,185,80,0.06)", border:"1px solid rgba(63,185,80,0.18)", borderRadius:6, padding:"7px 12px", display:"flex", gap:10, alignItems:"center" }}>
+                <span style={{ ...TM, color:"#3FB950", fontSize:10, fontWeight:700 }}>★ FIRST FILL</span>
+                <span style={{ ...TM, color:"#2A5030", fontSize:9 }}>New therapy — counseling offer required at release per §54.1-3319</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── INSURANCE / BILLING ── */}
+        <div style={{ background: "#FFFFFF", margin: "6px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
+          <div style={{ background: "#1A3060", padding: "6px 12px" }}>
+            <span style={{ ...TM, color: "#7EB8C9", fontSize: 9, letterSpacing: 1.5 }}>BILLING — INSURANCE ON FILE</span>
+          </div>
+          <div style={{ padding: "10px 14px" }}>
+            {rx.plan?.bin ? (
+              <>
+                <div style={{ fontSize:13, fontWeight:700, color:"#0B1F3A", marginBottom:8 }}>{rx.insurancePlan}</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6, marginBottom:6 }}>
+                  {[{ k:"BIN", v:rx.plan.bin },{ k:"PCN", v:rx.plan.pcn },{ k:"GROUP", v:rx.plan.grp }].map(({ k, v }) => (
+                    <div key={k} style={{ background:"#F2F5F7", borderRadius:5, padding:"5px 8px" }}>
+                      <div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>{k}</div>
+                      <div style={{ ...TM, fontSize:10, fontWeight:700, color:"#0B1F3A", marginTop:2 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                  <div style={{ background:"#F2F5F7", borderRadius:5, padding:"5px 8px", flex:2, minWidth:100 }}>
+                    <div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>MEMBER ID</div>
+                    <div style={{ ...TM, fontSize:10, fontWeight:700, color:"#0B1F3A", marginTop:2 }}>{rx.memberId||"—"}</div>
+                  </div>
+                  <div style={{ background: rx.copay===0?"rgba(63,185,80,0.1)":"#F2F5F7", border: rx.copay===0?"1px solid rgba(63,185,80,0.22)":"none", borderRadius:5, padding:"5px 8px", flex:1, minWidth:70 }}>
+                    <div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>COPAY</div>
+                    <div style={{ ...TM, fontSize:14, fontWeight:800, color: rx.copay===0?"#3FB950":"#0B1F3A", marginTop:2 }}>{rx.copay!=null?`$${rx.copay}.00`:"—"}</div>
+                  </div>
+                  <div style={{ background:"#F2F5F7", borderRadius:5, padding:"5px 8px", flex:1, minWidth:70 }}>
+                    <div style={{ ...TM, fontSize:7, color:"#5A7080", letterSpacing:1 }}>FORMULARY</div>
+                    <div style={{ ...TM, fontSize:9, fontWeight:700, color:"#4A8FA5", marginTop:2 }}>
+                      {getDrugTier(rx.drug)==="G"?"Generic":getDrugTier(rx.drug)==="PB"?"Pref. Brand":getDrugTier(rx.drug)==="NB"?"Non-Pref.":"Specialty"}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ ...TM, fontSize:12, color:"#5A7080", fontStyle:"italic" }}>Cash — No insurance on file. Patient pays full retail price.</div>
+            )}
+          </div>
+        </div>
+
+        {/* ── FILLED VIAL ── */}
         <div style={{ background: "#FFFFFF", margin: "8px 12px 0", borderRadius: 8, border: "1px solid #D0D8E0", overflow: "hidden" }}>
           <div style={{ background: "#2A1F00", padding: "6px 12px" }}>
             <span style={{ ...TM, color: "#FFB800", fontSize: 9, letterSpacing: 1.5 }}>FILLED VIAL — INSPECT NOW</span>
