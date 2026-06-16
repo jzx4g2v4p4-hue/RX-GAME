@@ -146,6 +146,13 @@ const MODES = [
     desc: "Work multi-day CVS shifts. Build your stats, chase promotion from Intern to Pharmacist-in-Charge, bank bonuses, and don't let the metrics tank.",
     icon: "$",
   },
+  {
+    id: 15,
+    title: "NAPLEX Calc",
+    tag: "Clinical Calculations",
+    desc: "30 NAPLEX-style calculation questions: CrCl, IV rates, concentrations, alligation, pharmacokinetics, pediatric dosing, mEq, TPN, drip rates, and more. Worked solutions shown after each answer.",
+    icon: "∑",
+  },
 ];
 
 const ACHIEVEMENTS = [
@@ -6569,6 +6576,281 @@ function ManagerShift({ level, hourlyRate = 65, onShiftComplete, onFinish, onQui
   );
 }
 
+/* ============================================================
+   NAPLEX CALC BANK — 30 calculation questions
+   ============================================================ */
+const CALC_BANK = [
+  // ── CREATININE CLEARANCE (Cockcroft-Gault) ──
+  { id:"crcl1", cat:"CrCl / Renal Function",
+    scenario:"Male, 72 yo, 80 kg. Serum creatinine (SCr) = 1.5 mg/dL.",
+    q:"Estimate his creatinine clearance using the Cockcroft-Gault equation.",
+    opts:["38 mL/min","50 mL/min","65 mL/min","78 mL/min"], ans:1,
+    work:"CrCl = [(140 − age) × weight] ÷ (72 × SCr)\n= [(140 − 72) × 80] ÷ (72 × 1.5)\n= [68 × 80] ÷ 108\n= 5,440 ÷ 108\n≈ 50 mL/min" },
+  { id:"crcl2", cat:"CrCl / Renal Function",
+    scenario:"Female, 60 yo, 60 kg. SCr = 1.2 mg/dL. Use 0.85 correction for females.",
+    q:"What is her estimated CrCl?",
+    opts:["31 mL/min","47 mL/min","56 mL/min","66 mL/min"], ans:1,
+    work:"CrCl = [(140 − 60) × 60] ÷ (72 × 1.2) × 0.85\n= 4,800 ÷ 86.4 × 0.85\n= 55.6 × 0.85\n≈ 47 mL/min" },
+  { id:"crcl3", cat:"CrCl / Renal Function",
+    scenario:"Male, 65 yo, 70 kg. SCr = 1.0 mg/dL.",
+    q:"What is his CrCl?",
+    opts:["52 mL/min","63 mL/min","73 mL/min","84 mL/min"], ans:2,
+    work:"CrCl = [(140 − 65) × 70] ÷ (72 × 1.0)\n= [75 × 70] ÷ 72\n= 5,250 ÷ 72\n≈ 73 mL/min" },
+  // ── RENAL DOSE ADJUSTMENT ──
+  { id:"renal1", cat:"Renal Dose Adjustment",
+    scenario:"Vancomycin ordered 25 mg/kg IV. Patient: 70 kg, CrCl = 20 mL/min. Dosing table: CrCl < 30 → extend to q48h.",
+    q:"What is the appropriate dose and interval?",
+    opts:["875 mg q12h","1,750 mg q12h","875 mg q48h","1,750 mg q48h"], ans:3,
+    work:"Dose = 25 mg/kg × 70 kg = 1,750 mg\nCrCl 20 mL/min < 30 → interval extended to q48h\nAnswer: 1,750 mg q48h" },
+  { id:"renal2", cat:"Renal Dose Adjustment",
+    scenario:"Standard dose: 500 mg q12h. PI: reduce by 50% for CrCl 10–30 mL/min. Patient CrCl = 22 mL/min.",
+    q:"What is the adjusted dose?",
+    opts:["125 mg q12h","250 mg q12h","500 mg q24h","750 mg q24h"], ans:1,
+    work:"50% dose reduction: 500 mg × 0.50 = 250 mg\nInterval unchanged at q12h\nAnswer: 250 mg q12h" },
+  // ── IV FLOW RATES ──
+  { id:"iv1", cat:"IV Flow Rate",
+    scenario:"Order: 1,000 mL NS over 8 hours.",
+    q:"What is the infusion rate in mL/hr?",
+    opts:["80 mL/hr","100 mL/hr","125 mL/hr","150 mL/hr"], ans:2,
+    work:"Rate = Volume ÷ Time\n= 1,000 mL ÷ 8 hr\n= 125 mL/hr" },
+  { id:"iv2", cat:"IV Flow Rate",
+    scenario:"500 mL D5W to infuse over 4 hours. IV tubing: 20 gtt/mL.",
+    q:"What is the infusion rate in drops per minute?",
+    opts:["25 gtt/min","31 gtt/min","42 gtt/min","60 gtt/min"], ans:2,
+    work:"gtt/min = (Volume × Drop factor) ÷ (Time in min)\n= (500 mL × 20 gtt/mL) ÷ (4 hr × 60 min/hr)\n= 10,000 ÷ 240\n≈ 42 gtt/min" },
+  { id:"iv3", cat:"IV Flow Rate",
+    scenario:"Heparin infusion: 25,000 units in 500 mL NS. Order: 1,000 units/hr.",
+    q:"What is the infusion rate in mL/hr?",
+    opts:["10 mL/hr","15 mL/hr","20 mL/hr","25 mL/hr"], ans:2,
+    work:"Concentration = 25,000 units ÷ 500 mL = 50 units/mL\nRate = 1,000 units/hr ÷ 50 units/mL\n= 20 mL/hr" },
+  // ── CONCENTRATION / DILUTION (C₁V₁ = C₂V₂) ──
+  { id:"conc1", cat:"Concentration & Dilution",
+    scenario:"Prepare 500 mL of 0.45% NaCl from 0.9% NaCl and sterile water.",
+    q:"How many mL of 0.9% NaCl are needed?",
+    opts:["125 mL","200 mL","250 mL","375 mL"], ans:2,
+    work:"C₁V₁ = C₂V₂\n0.9% × V₁ = 0.45% × 500 mL\nV₁ = 225 ÷ 0.9 = 250 mL\nQS to 500 mL with sterile water." },
+  { id:"conc2", cat:"Concentration & Dilution",
+    scenario:"Vancomycin vial: 1 g in 10 mL. Order: 750 mg IV.",
+    q:"How many mL do you withdraw?",
+    opts:["5.0 mL","6.5 mL","7.5 mL","8.0 mL"], ans:2,
+    work:"Concentration = 1,000 mg ÷ 10 mL = 100 mg/mL\nVolume = 750 mg ÷ 100 mg/mL = 7.5 mL" },
+  { id:"conc3", cat:"Concentration & Dilution",
+    scenario:"Morphine sulfate 10 mg/mL injection. Order: 4 mg IV push.",
+    q:"How many mL do you administer?",
+    opts:["0.2 mL","0.4 mL","0.8 mL","1.0 mL"], ans:1,
+    work:"Volume = Dose ÷ Concentration\n= 4 mg ÷ 10 mg/mL = 0.4 mL" },
+  // ── ALLIGATION ──
+  { id:"allig1", cat:"Alligation",
+    scenario:"Prepare 500 mL of 70% isopropyl alcohol using 95% and 30% isopropyl alcohol.",
+    q:"How many mL of 95% alcohol are needed?",
+    opts:["154 mL","192 mL","308 mL","385 mL"], ans:2,
+    work:"Alligation alternate:\nParts of 95%: desired − lower = 70 − 30 = 40 parts\nParts of 30%: higher − desired = 95 − 70 = 25 parts\nTotal parts: 65\nVolume of 95% = (40 ÷ 65) × 500 mL ≈ 308 mL" },
+  { id:"allig2", cat:"Alligation",
+    scenario:"Mix 2% and 8% cream to prepare a 4% cream.",
+    q:"What is the ratio of 2% cream to 8% cream?",
+    opts:["1:1","1:2","2:1","3:1"], ans:2,
+    work:"Alligation:\nParts of 2%: higher − desired = 8 − 4 = 4 parts\nParts of 8%: desired − lower = 4 − 2 = 2 parts\nRatio 2%:8% = 4:2 = 2:1" },
+  // ── PEDIATRIC DOSING ──
+  { id:"peds1", cat:"Pediatric Dosing",
+    scenario:"Child weighs 22 kg. Amoxicillin 40 mg/kg/day divided every 8 hours (TID).",
+    q:"What is the dose per administration?",
+    opts:["147 mg","200 mg","293 mg","440 mg"], ans:2,
+    work:"Total daily dose = 40 mg/kg × 22 kg = 880 mg/day\nDose per administration = 880 ÷ 3 = 293 mg" },
+  { id:"peds2", cat:"Pediatric Dosing",
+    scenario:"Child weighs 15 kg. Ibuprofen 10 mg/kg/dose. Available: 100 mg/5 mL suspension.",
+    q:"How many mL do you dispense per dose?",
+    opts:["3.0 mL","5.0 mL","7.5 mL","10.0 mL"], ans:2,
+    work:"Dose = 10 mg/kg × 15 kg = 150 mg\nVolume = 150 mg ÷ (100 mg/5 mL)\n= 150 × 5 ÷ 100 = 7.5 mL" },
+  { id:"peds3", cat:"Pediatric Dosing",
+    scenario:"Child weighs 88 lbs. Drug ordered at 25 mg/kg/day.",
+    q:"What is the total daily dose in mg?",
+    opts:["500 mg","800 mg","1,000 mg","2,000 mg"], ans:2,
+    work:"Weight: 88 lbs ÷ 2.2 = 40 kg\nTotal daily dose = 25 mg/kg × 40 kg = 1,000 mg/day" },
+  // ── PHARMACOKINETICS ──
+  { id:"pk1", cat:"Pharmacokinetics",
+    scenario:"Drug half-life (t½) = 6 hours. Initial plasma concentration = 32 mg/L.",
+    q:"What is the concentration after 24 hours?",
+    opts:["1 mg/L","2 mg/L","4 mg/L","8 mg/L"], ans:1,
+    work:"Half-lives elapsed = 24 hr ÷ 6 hr = 4 half-lives\n32 → 16 → 8 → 4 → 2 mg/L" },
+  { id:"pk2", cat:"Pharmacokinetics",
+    scenario:"Drug: Vd = 42 L, clearance (CL) = 7 L/hr.",
+    q:"What is the elimination half-life?",
+    opts:["2.1 hr","4.2 hr","6.3 hr","8.3 hr"], ans:1,
+    work:"t½ = 0.693 × Vd ÷ CL\n= 0.693 × 42 ÷ 7\n= 0.693 × 6\n≈ 4.2 hr" },
+  { id:"pk3", cat:"Pharmacokinetics",
+    scenario:"Target steady-state concentration (Css) = 20 mg/L. Vd = 40 L. IV bolus (bioavailability F = 1).",
+    q:"What loading dose achieves this target concentration?",
+    opts:["200 mg","400 mg","600 mg","800 mg"], ans:3,
+    work:"Loading Dose = Css × Vd ÷ F\n= 20 mg/L × 40 L ÷ 1\n= 800 mg" },
+  // ── IV DRIP — mcg/kg/min ──
+  { id:"drip1", cat:"IV Drip — mcg/kg/min",
+    scenario:"Dobutamine ordered at 5 mcg/kg/min. Patient: 70 kg. Bag: 250 mg in 250 mL D5W.",
+    q:"What is the infusion rate in mL/hr?",
+    opts:["12 mL/hr","15 mL/hr","21 mL/hr","28 mL/hr"], ans:2,
+    work:"Dose rate = 5 mcg/kg/min × 70 kg = 350 mcg/min\nConcentration = 250,000 mcg ÷ 250 mL = 1,000 mcg/mL\nRate = 350 ÷ 1,000 = 0.35 mL/min × 60 = 21 mL/hr" },
+  { id:"drip2", cat:"IV Drip — mcg/kg/min",
+    scenario:"Norepinephrine 0.1 mcg/kg/min for 80 kg patient. Bag: 4 mg in 250 mL NS.",
+    q:"What is the infusion rate in mL/hr?",
+    opts:["15 mL/hr","20 mL/hr","25 mL/hr","30 mL/hr"], ans:3,
+    work:"Dose rate = 0.1 mcg/kg/min × 80 kg = 8 mcg/min\nConcentration = 4,000 mcg ÷ 250 mL = 16 mcg/mL\nRate = 8 ÷ 16 = 0.5 mL/min × 60 = 30 mL/hr" },
+  // ── PERCENT STRENGTH / mEq ──
+  { id:"pct1", cat:"Percent Strength",
+    scenario:"Normal saline (NS) = 0.9% NaCl. 1 liter bag.",
+    q:"How many grams of NaCl does the bag contain?",
+    opts:["0.9 g","4.5 g","9.0 g","18 g"], ans:2,
+    work:"0.9% = 0.9 g per 100 mL\nIn 1,000 mL: 0.9 × 10 = 9.0 g" },
+  { id:"meq1", cat:"mEq Calculations",
+    scenario:"Order: 40 mEq KCl to be added to 1 L NS. Available: KCl 2 mEq/mL.",
+    q:"How many mL of KCl do you add?",
+    opts:["10 mL","15 mL","20 mL","40 mL"], ans:2,
+    work:"Volume = Dose ÷ Concentration\n= 40 mEq ÷ 2 mEq/mL = 20 mL" },
+  { id:"meq2", cat:"mEq Calculations",
+    scenario:"Patient needs 60 mEq K+ PO. Available: KCl 10 mEq / 5 mL oral solution.",
+    q:"How many mL does the patient take?",
+    opts:["15 mL","20 mL","30 mL","50 mL"], ans:2,
+    work:"Volume = (60 mEq ÷ 10 mEq) × 5 mL\n= 6 × 5 = 30 mL" },
+  { id:"meq3", cat:"mEq Calculations",
+    scenario:"How many mEq of Na⁺ are in 500 mL of 0.9% NaCl? (MW of NaCl = 58.5 g/mol; Na⁺ is monovalent.)",
+    q:"Choose the closest answer.",
+    opts:["39 mEq","77 mEq","154 mEq","308 mEq"], ans:1,
+    work:"Mass of NaCl in 500 mL: 9 g/L × 0.5 L = 4.5 g = 4,500 mg\nmEq = mg ÷ Equivalent weight\nEq weight = MW for monovalent = 58.5\nmEq = 4,500 ÷ 58.5 ≈ 77 mEq" },
+  // ── DAYS SUPPLY ──
+  { id:"days1", cat:"Days Supply",
+    scenario:"Metformin 500 mg #180 tablets. Sig: 1 tab PO BID.",
+    q:"What is the days supply?",
+    opts:["30 days","45 days","60 days","90 days"], ans:3,
+    work:"Daily dose = 1 tab × 2 (BID) = 2 tabs/day\nDays supply = 180 ÷ 2 = 90 days" },
+  { id:"days2", cat:"Days Supply",
+    scenario:"Albuterol MDI, 200 actuations. Sig: 2 puffs QID (4× daily) PRN. Calculate maximum use.",
+    q:"How many days does one inhaler last at maximum use?",
+    opts:["12 days","20 days","25 days","50 days"], ans:2,
+    work:"Daily puffs (max) = 2 puffs × 4 times/day = 8 puffs/day\nDays supply = 200 ÷ 8 = 25 days" },
+  // ── BODY WEIGHT / BSA ──
+  { id:"ibw1", cat:"Ideal Body Weight",
+    scenario:"Male patient, height 5′10″ (70 inches). Devine formula: IBW (male) = 50 + 2.3 × (height in inches − 60).",
+    q:"What is his ideal body weight?",
+    opts:["50 kg","62 kg","73 kg","82 kg"], ans:2,
+    work:"IBW = 50 + 2.3 × (70 − 60)\n= 50 + 2.3 × 10\n= 50 + 23 = 73 kg" },
+  { id:"bsa1", cat:"Body Surface Area",
+    scenario:"Patient: weight 70 kg, height 175 cm. Mosteller formula: BSA (m²) = √(height [cm] × weight [kg] ÷ 3,600).",
+    q:"What is this patient's BSA?",
+    opts:["1.62 m²","1.74 m²","1.84 m²","2.01 m²"], ans:2,
+    work:"BSA = √(175 × 70 ÷ 3,600)\n= √(12,250 ÷ 3,600)\n= √3.403\n≈ 1.84 m²" },
+  // ── TPN / NUTRITION ──
+  { id:"tpn1", cat:"TPN / Nutrition",
+    scenario:"Patient needs 2,200 kcal/day. Plan: Protein 80 g (4 kcal/g), Dextrose 300 g (3.4 kcal/g). Remainder from fat (9 kcal/g).",
+    q:"How many grams of fat are needed?",
+    opts:["48 g","64 g","80 g","96 g"], ans:3,
+    work:"Protein kcal: 80 × 4 = 320 kcal\nDextrose kcal: 300 × 3.4 = 1,020 kcal\nFat kcal needed: 2,200 − 320 − 1,020 = 860 kcal\nFat grams: 860 ÷ 9 ≈ 96 g" },
+];
+
+function CalcMode({ level, onFinish, onQuit }) {
+  const SESSION = 12;
+  const [pool] = useState(() => shuffle([...CALC_BANK]).slice(0, SESSION));
+  const [idx, setIdx] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [correct, setCorrect] = useState(0);
+
+  const q = pool[idx];
+  const locked = picked !== null;
+  const isRight = picked === q?.ans;
+
+  function handlePick(i) {
+    if (locked) return;
+    setPicked(i);
+    if (i === q.ans) setCorrect((c) => c + 1);
+  }
+
+  function next() {
+    if (idx + 1 >= pool.length) {
+      onFinish({ mode: 15, correct, total: pool.length, score: correct * 10 });
+    } else {
+      setIdx((i) => i + 1);
+      setPicked(null);
+    }
+  }
+
+  if (!q) return null;
+
+  const pct = Math.round(((idx + (locked ? 1 : 0)) / pool.length) * 100);
+
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 4px" }}>
+      {/* Header */}
+      <div style={{ background:"#CC0000", borderRadius:"10px 10px 0 0", padding:"10px 14px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div>
+          <div style={{ ...TM, color:"rgba(255,255,255,0.65)", fontSize:8, letterSpacing:2 }}>NAPLEX PREP · CLINICAL CALCULATIONS</div>
+          <div style={{ ...TM, color:"#fff", fontWeight:700, fontSize:13, marginTop:2 }}>Question {idx + 1} of {pool.length}</div>
+        </div>
+        <div style={{ textAlign:"right" }}>
+          <div style={{ ...TM, color:"rgba(255,255,255,0.65)", fontSize:8, letterSpacing:1 }}>SCORE</div>
+          <div style={{ ...TM, color:"#fff", fontWeight:800, fontSize:16 }}>{correct}/{idx + (locked?1:0)}</div>
+        </div>
+      </div>
+      {/* Progress bar */}
+      <div style={{ height:3, background:"rgba(255,255,255,0.2)", borderRadius:0 }}>
+        <div style={{ width:`${pct}%`, height:"100%", background:"#3FB950", transition:"width 0.3s" }} />
+      </div>
+
+      <div style={{ background:"#F2F5F7", borderRadius:"0 0 10px 10px", border:"1px solid #D0D8E0", borderTop:"none", padding:"14px 14px 18px" }}>
+        {/* Category chip */}
+        <div style={{ ...TM, fontSize:8, color:"#4A8FA5", letterSpacing:1.5, fontWeight:700, marginBottom:8, textTransform:"uppercase" }}>{q.cat}</div>
+
+        {/* Scenario */}
+        <div style={{ background:"#FFFFFF", borderRadius:7, border:"1px solid #D0D8E0", padding:"11px 14px", marginBottom:10 }}>
+          <div style={{ ...TM, fontSize:8, color:"#5A7080", letterSpacing:1, marginBottom:5 }}>CLINICAL SCENARIO</div>
+          <div style={{ fontSize:13, color:"#0B1F3A", lineHeight:1.55 }}>{q.scenario}</div>
+        </div>
+
+        {/* Question */}
+        <div style={{ fontSize:14, fontWeight:700, color:"#0B1F3A", marginBottom:12, lineHeight:1.4, paddingLeft:2 }}>{q.q}</div>
+
+        {/* Options */}
+        <div style={{ display:"flex", flexDirection:"column", gap:7, marginBottom:12 }}>
+          {q.opts.map((opt, i) => {
+            let bg = "#FFFFFF", border = "1px solid #D0D8E0", color = "#1A2A35";
+            if (locked) {
+              if (i === q.ans) { bg="rgba(63,185,80,0.1)"; border="1.5px solid #3FB950"; color="#1A5030"; }
+              else if (i === picked && i !== q.ans) { bg="rgba(255,68,68,0.08)"; border="1.5px solid #FF4444"; color="#CC0000"; }
+              else { bg="#F8FAFB"; color="#A0AAAA"; }
+            }
+            return (
+              <button key={i} onClick={() => handlePick(i)}
+                style={{ ...TM, background:bg, border, borderRadius:7, padding:"11px 14px", textAlign:"left", color, fontSize:12, cursor:locked?"default":"pointer", fontWeight: locked && i===q.ans ? 700 : 400, transition:"all 0.15s" }}>
+                <span style={{ color:"#4A8FA5", marginRight:8 }}>{["A","B","C","D"][i]}.</span>{opt}
+                {locked && i===q.ans && <span style={{ float:"right", color:"#3FB950" }}>✓</span>}
+                {locked && i===picked && i!==q.ans && <span style={{ float:"right", color:"#FF4444" }}>✗</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Worked solution */}
+        {locked && (
+          <div style={{ background:"#0B1F3A", borderRadius:8, overflow:"hidden", marginBottom:12 }}>
+            <div style={{ padding:"7px 12px", background: isRight ? "#1A3A1A" : "#3A1A1A", borderBottom:`1px solid ${isRight?"rgba(63,185,80,0.3)":"rgba(255,68,68,0.25)"}` }}>
+              <span style={{ ...TM, fontSize:10, fontWeight:700, color: isRight?"#3FB950":"#FF4444" }}>
+                {isRight ? "✓ CORRECT" : "✗ INCORRECT — WORKED SOLUTION:"}
+              </span>
+            </div>
+            <pre style={{ ...TM, fontSize:11.5, color:"#A8D8EA", padding:"12px 14px", margin:0, whiteSpace:"pre-wrap", lineHeight:1.75 }}>{q.work}</pre>
+          </div>
+        )}
+
+        {locked && (
+          <button onClick={next} style={{ ...TM, width:"100%", background:"#CC0000", color:"#fff", border:"none", borderRadius:8, padding:"13px 0", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+            {idx + 1 >= pool.length ? "VIEW RESULTS →" : "NEXT QUESTION →"}
+          </button>
+        )}
+      </div>
+
+      <button onClick={onQuit} style={{ ...TM, display:"block", width:"100%", marginTop:10, background:"transparent", border:"1px solid #D0D8E0", color:"#8A9AAA", borderRadius:8, padding:"9px 0", cursor:"pointer", fontSize:11 }}>
+        EXIT SESSION
+      </button>
+    </div>
+  );
+}
+
 function CareerMode({ level, onQuit }) {
   const [bankBalance, setBankBalance] = useState(1000);
   const [hourlyRate, setHourlyRate] = useState(65);
@@ -6860,7 +7142,7 @@ export default function App() {
   const begin = () => setScreen("play");
   const finish = (res) => {
     setResult(res); setScreen("result");
-    const modeTag = mode === 8 ? 'law' : mode === 7 ? 'insurance' : mode === 3 ? 'counter' : mode === 2 ? 'fill' : 'general';
+    const modeTag = mode === 8 ? 'law' : mode === 7 ? 'insurance' : mode === 15 ? 'law' : mode === 3 ? 'counter' : mode === 2 ? 'fill' : 'general';
     let s = recordDrillResult({ correct: res.correct || 0, total: res.total || 0, modeTag, save, setSave });
     s = recordActivity(mode, s, setSave);
 
@@ -7075,6 +7357,9 @@ export default function App() {
         )}
         {screen === "play" && mode === 14 && (
           <CareerMode level={level} onQuit={home} />
+        )}
+        {screen === "play" && mode === 15 && (
+          <CalcMode level={level} onFinish={finish} onQuit={home} />
         )}
         {screen === "result" && (
           <Result result={result} onAgain={() => setScreen("setup")} onHome={home} />
@@ -7406,6 +7691,7 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
         { label: "TECH BENCH",          sub: "Fill · Label · Billing · Law", ids: [4, 6, 2, 7] },
         { label: "PATIENT WINDOW",      sub: "Counter · Counseling · Speed", ids: [3, 8, 1] },
         { label: "FULL SHIFT",          sub: "Floor · Queue · Career", ids: [9, 13] },
+        { label: "NAPLEX PREP",         sub: "Calculations · Clinical Math", ids: [15] },
       ].map(({ label, sub, ids }) => (
         <div key={label} style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 6, paddingLeft: 2 }}>
@@ -7567,7 +7853,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
           </div>
         </>
       )}
-      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12 || mode === 13 || mode === 14) && (
+      {(mode === 2 || mode === 5 || mode === 6 || mode === 7 || mode === 8 || mode === 9 || mode === 10 || mode === 11 || mode === 12 || mode === 13 || mode === 14 || mode === 15) && (
         <div className="rx-card" style={{ padding: 14, marginBottom: 22, fontSize: 13.5, color: C.muted }}>
           {mode === 5
             ? "Each case bundles the full verification workflow — DUR review, the safety alert, and your decision. Just set your difficulty."
@@ -7589,6 +7875,8 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
             ? "Run the manager loop: approve data verification, wait for the auto-tech production timers, then inspect final fills with vial visuals."
             : mode === 14
             ? "Career Mode wraps the manager loop in money, penalties, promotions, and bankruptcy. Career shifts force PIC-level cases."
+            : mode === 15
+            ? "12 NAPLEX-style questions per session drawn from 30 in the bank. Each has a step-by-step worked solution shown after you answer. No timer — focus on understanding the math."
             : "Each prescription in this mode naturally covers several skills — sig translation, math, error-catching, and counseling — so there's nothing to toggle. Just set your difficulty."}
         </div>
       )}
@@ -7628,7 +7916,7 @@ function Setup({ mode, skills, setSkills, qtypes, setQtypes, level, setLevel, on
         <button onClick={onBegin}
           disabled={blocked}
           style={btn(C.pine, C.paper, { flex: 1, opacity: blocked ? 0.4 : 1 })}>
-          {isMastery ? "Start set →" : mode === 9 || mode === 13 || mode === 14 ? "Clock in →" : "Start shift →"}
+          {isMastery ? "Start set →" : mode === 15 ? "Begin session →" : mode === 9 || mode === 13 || mode === 14 ? "Clock in →" : "Start shift →"}
         </button>
       </div>
     </div>
