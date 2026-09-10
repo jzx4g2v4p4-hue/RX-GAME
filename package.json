@@ -1,7 +1,7 @@
 {
   "name": "rxready",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "RxReady — a retro-arcade training game for retail pharmacists",
   "type": "module",
   "scripts": {
