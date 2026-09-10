@@ -153,6 +153,13 @@ const MODES = [
     desc: "30 NAPLEX-style calculation questions: CrCl, IV rates, concentrations, alligation, pharmacokinetics, pediatric dosing, mEq, TPN, drip rates, and more. Worked solutions shown after each answer.",
     icon: "∑",
   },
+  {
+    id: 16,
+    title: "Full Run",
+    tag: "Start to Finish",
+    desc: "One script, all the way through: key the entry, check the technician's fill, then make the final clinical call — on the same prescription, in the order it actually happens.",
+    icon: "⟳",
+  },
 ];
 
 const ACHIEVEMENTS = [
@@ -230,8 +237,8 @@ const MODE_GROUPS = [
     title: "Pharmacist Station",
     tag: "QV1 · DUR · QV2",
     lead: 10,
-    modes: [11, 10, 5, 12],
-    desc: "Your chair at the bench: type incoming scripts (QT), check entries (QV1), screen for DURs, and clear QV2 before will-call.",
+    modes: [11, 10, 5, 12, 16],
+    desc: "Your chair at the bench: type incoming scripts (QT), check entries (QV1), screen for DURs, and clear QV2 before will-call — or take one script through all three stages in Full Run.",
   },
   {
     id: "workflow",
@@ -2233,6 +2240,16 @@ const SIG_ABBR = [
   [/\btabs?\b/g, "tablet"], [/\bcaps?\b/g, "capsule"], [/\bgtts?\b/g, "drop"],
   [/\btsp\b/g, "teaspoon"], [/\btbsp\b/g, "tablespoon"], [/\bml\b/g, "ml"],
   [/\bq(\d+)h\b/g, "every $1 hours"], [/\bunits?\b/g, "unit"], [/\bx\s*(\d+)\s*d(ays?)?\b/g, "for $1 days"],
+  [/\bac\b/g, "before meals"], [/\bpc\b/g, "after meals"], [/\bqpm\b/g, "every evening"], [/\bnoct\b/g, "at night"],
+  [/\bqod\b/g, "every other day"], [/\btiw\b/g, "three times weekly"], [/\bqwk\b/g, "weekly"], [/\bqweek\b/g, "weekly"],
+  [/\bud\b/g, "as directed"], [/\butd\b/g, "as directed"], [/\bmdu\b/g, "as directed"],
+  [/\bss\b/g, "sliding scale"],
+  [/\binh\b/g, "inhale"], [/\bneb\b/g, "nebulize"], [/\bpuffs?\b/g, "puff"],
+  [/\bung\b/g, "ointment"], [/\bsupp\b/g, "suppository"], [/\bpr\b/g, "rectally"], [/\bpv\b/g, "vaginally"],
+  [/\btop\b/g, "topically"], [/\b(?:aff|affected)\b(?:\s+area)?/g, "affected area"],
+  [/\bstat\b/g, "immediately"], [/\bmeq\b/g, "meq"],
+  [/\bos\b/g, "left eye"], [/\bod\b/g, "right eye"], [/\bau\b/g, "both ears"],
+  [/\bwith meals\b/g, "with food"],
 ];
 function normSig(s) {
   let t = " " + s.toLowerCase().replace(/[.,;()/]/g, " ").replace(/\s+/g, " ") + " ";
@@ -3658,17 +3675,25 @@ function expandSig(s) {
     [/\bq\s*(\d+)\s*h\b/g, " every $1 hours "],
     [/\bbid\b/g, " twice daily "], [/\btid\b/g, " three times daily "], [/\bqid\b/g, " four times daily "],
     [/\bqhs\b/g, " at bedtime "], [/\bhs\b/g, " at bedtime "], [/\bqd\b/g, " once daily "],
-    [/\bqam\b/g, " every morning "], [/\bqpm\b/g, " every evening "],
+    [/\bqam\b/g, " every morning "], [/\bqpm\b/g, " every evening "], [/\bnoct\b/g, " at night "],
+    [/\bqod\b/g, " every other day "], [/\btiw\b/g, " three times weekly "], [/\bqwk\b/g, " weekly "],
     [/\bprn\b/g, " as needed "], [/\bpo\b/g, " by mouth "], [/\bsl\b/g, " under the tongue "],
+    [/\bss\b/g, " sliding scale "], [/\bud\b/g, " as directed "], [/\butd\b/g, " as directed "],
     [/\bsc\b/g, " subcutaneously "], [/\bsq\b/g, " subcutaneously "], [/\bsubq\b/g, " subcutaneously "],
     [/\btabs?\b/g, " tablet "], [/\bcaps?\b/g, " capsule "], [/\bgtts?\b/g, " drops "],
+    [/\binh\b/g, " inhale "], [/\bneb\b/g, " nebulize "], [/\bpuffs?\b/g, " puffs "],
+    [/\bung\b/g, " ointment "], [/\bsupp\b/g, " suppository "], [/\bpr\b/g, " rectally "], [/\bpv\b/g, " vaginally "],
+    [/\btop\b/g, " topically "], [/\bapply\b/g, " apply "], [/\baff\b(?:\s+area)?/g, " affected area "],
     [/\bou\b/g, " in both eyes "], [/\bod\b/g, " in the right eye "], [/\bos\b/g, " in the left eye "],
     [/\bau\b/g, " in both ears "], [/\bac\b/g, " before meals "], [/\bpc\b/g, " after meals "],
-    [/\bunits?\b/g, " units "], [/\bpuffs?\b/g, " puffs "],
+    [/\bstat\b/g, " immediately "], [/\bunits?\b/g, " units "], [/\bmeq\b/g, " mEq "],
   ];
   map.forEach(([re, rep]) => { t = t.replace(re, rep); });
   t = t.replace(/\s+/g, " ").trim();
-  if (/^\d/.test(t) || /^(tablet|capsule|puff)/.test(t)) t = "take " + t;
+  if (/^\d/.test(t) || /^(tablet|capsule|puff|drop|apply|inhale|instill|inject|place)/.test(t)) {
+    // verb-initial sigs already read as an instruction — don't prefix "take"
+    if (!/^(apply|inhale|instill|inject|place)/.test(t)) t = "take " + t;
+  }
   return t.toUpperCase();
 }
 function dirOK(concepts, typed) {
@@ -3676,41 +3701,102 @@ function dirOK(concepts, typed) {
   return concepts.every((g) => g.some((tok) => n.includes(tok)));
 }
 
+// parse consumed-per-day for a scheduled sig → returns a number or null
+function perDayFromSig(typed) {
+  const n = " " + normSig(typed) + " ";
+  // Skip forms where the dispensed quantity isn't in the same unit as the dose —
+  // drops/mL, insulin units/vial, puffs/inhaler, grams of cream — plus anything
+  // unscheduled. Dividing quantity by doses-per-day would give a wrong answer.
+  if (/(sliding scale|as needed|as directed|puff|inhale|nebulize|topically|apply|suppository|drop|unit)/.test(n)) return null;
+  let times = null;
+  if (/every other day/.test(n)) times = 0.5;
+  else if (/three times weekly/.test(n)) times = 3 / 7;
+  else if (/\bweekly\b/.test(n)) times = 1 / 7;
+  else if (/four times/.test(n)) times = 4;
+  else if (/three times/.test(n)) times = 3;
+  else if (/twice/.test(n)) times = 2;
+  else {
+    const qh = n.match(/every (\d+) hours/);
+    if (qh) times = 24 / parseFloat(qh[1]);
+    else if (/(once daily|every morning|every evening|bedtime|night|\bdaily\b)/.test(n)) times = 1;
+  }
+  if (times == null) return null;
+  const dose = n.match(/\b(\d+(\.\d+)?)\b/);
+  const amt = dose ? parseFloat(dose[1]) : 1;
+  return amt * times;
+}
+
+// DEA number checksum: 2 letters + 7 digits; (d1+d3+d5) + 2*(d2+d4+d6) ends in d7
+function deaValid(dea) {
+  if (!dea) return false;
+  const s = dea.toUpperCase().replace(/\s/g, "");
+  if (!/^[A-Z][A-Z0-9][0-9]{7}$/.test(s)) return false;
+  const d = s.slice(2).split("").map(Number);
+  const chk = (d[0] + d[2] + d[4]) + 2 * (d[1] + d[3] + d[5]);
+  return chk % 10 === d[6];
+}
+
+// shorthand the data-entry sig field autocompletes on
+const SIG_CODES = [
+  ["po", "by mouth"], ["bid", "twice daily"], ["tid", "three times daily"], ["qid", "four times daily"],
+  ["qd", "once daily"], ["daily", "once daily"], ["qhs", "at bedtime"], ["qam", "every morning"],
+  ["qpm", "every evening"], ["prn", "as needed"], ["ac", "before meals"], ["pc", "after meals"],
+  ["qod", "every other day"], ["tiw", "3x weekly"], ["sl", "under tongue"], ["subq", "subcutaneously"],
+  ["tab", "tablet"], ["cap", "capsule"], ["gtt", "drop"], ["ou", "both eyes"], ["od", "right eye"],
+  ["os", "left eye"], ["ung", "ointment"], ["inh", "inhale"], ["ud", "as directed"], ["ss", "sliding scale"],
+  ["stat", "now"], ["units", "units"], ["apply", "apply"], ["aff", "affected area"],
+];
+
 const INTAKE = [
   {
     level: 1, drug: "verapamil", strength: "40 mg", prescriber: "Jeremy Roberts, MD", prescriberAddr: "2850 Country Club Rd, Laredo, TX",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "verapamil 40 mg", ndc: "00591-0461" }, { t: "verapamil 80 mg", ndc: "00591-0462" }, { t: "verapamil 120 mg", ndc: "00591-0463" }], ansNdc: 0,
+    prescriberOptions: ["Jeremy Roberts, MD", "Jerome Robert, MD", "Jeremy Robertson, DO"], ansPresc: 0,
     orig: { patient: "Roland Reid", dob: "12/26/86", date: "4/9/22", drug: "verapamil", strength: "40 mg", disp: "60", sig: "1 tab po BID", refills: "7", dawChecked: false },
     ans: { qtyAccept: ["60"], days: "30", refills: "7", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["twice", "two times", "2 times"]],
     dirModel: "Take 1 tablet by mouth twice daily.",
-    note: "Days supply = quantity ÷ doses per day = 60 ÷ 2 = 30. The DAW box says substitution permissible, so DAW 0.",
+    note: "Days supply = quantity ÷ doses per day = 60 ÷ 2 = 30. The DAW box says substitution permissible, so DAW 0. Origin code 1 (written hard copy).",
   },
   {
     level: 2, drug: "amoxicillin", strength: "500 mg", prescriber: "Priya Nair, MD", prescriberAddr: "300 Elm St, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "amoxicillin 500 mg", ndc: "00093-4155" }, { t: "amoxicillin 250 mg", ndc: "00093-4150" }, { t: "ampicillin 500 mg", ndc: "00093-3120" }], ansNdc: 0,
+    prescriberOptions: ["Priya Nair, MD", "Pria Naidu, MD", "Priya Nayar, MD"], ansPresc: 0,
     orig: { patient: "Marcus Hale", dob: "8/1/90", date: "5/20/25", drug: "amoxicillin", strength: "500 mg", disp: "30", sig: "1 cap po TID x10d", refills: "0", dawChecked: false },
     ans: { qtyAccept: ["30"], days: "10", refills: "0", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["three times", "3 times"], ["10 day", "ten day"]],
     dirModel: "Take 1 capsule by mouth three times daily for 10 days.",
-    note: "1 cap TID for 10 days = 30 capsules; days supply 10. Antibiotics are usually no-refill courses.",
+    note: "1 cap TID for 10 days = 30 capsules; days supply 10. Antibiotics are usually no-refill courses. Watch look-alikes: amoxicillin, not ampicillin.",
   },
   {
     level: 1, drug: "lisinopril", strength: "10 mg", prescriber: "Sam Okafor, MD", prescriberAddr: "88 Health Pkwy, Dayton, OH",
+    controlled: false, origin: "4", origins: "e-prescription",
+    ndcOptions: [{ t: "lisinopril 10 mg", ndc: "68180-0518" }, { t: "lisinopril 20 mg", ndc: "68180-0520" }, { t: "lisinopril 5 mg", ndc: "68180-0517" }], ansNdc: 0,
+    prescriberOptions: ["Sam Okafor, MD", "Sam Okorafor, MD", "Sammy Okafor, DO"], ansPresc: 0,
     orig: { patient: "Ethel Brooks", dob: "11/9/48", date: "4/18/25", drug: "lisinopril", strength: "10 mg", disp: "30", sig: "1 tab po daily", refills: "11", dawChecked: false },
     ans: { qtyAccept: ["30"], days: "30", refills: "11", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily", "once a day"]],
     dirModel: "Take 1 tablet by mouth once daily.",
-    note: "30 tabs once daily = 30-day supply. Chronic maintenance meds often carry the max refills (11 + original = 1 year).",
+    note: "30 tabs once daily = 30-day supply. Chronic maintenance meds often carry the max refills (11 + original = 1 year). E-script → origin 4.",
   },
   {
     level: 2, drug: "metformin", strength: "500 mg", prescriber: "Alan Frost, MD", prescriberAddr: "19 Mercy Blvd, Dayton, OH",
+    controlled: false, origin: "4", origins: "e-prescription",
+    ndcOptions: [{ t: "metformin 500 mg", ndc: "00093-1048" }, { t: "metformin ER 500 mg", ndc: "00093-7267" }, { t: "metformin 850 mg", ndc: "00093-1049" }], ansNdc: 0,
+    prescriberOptions: ["Alan Frost, MD", "Alan Forst, MD", "Allen Frost, DO"], ansPresc: 0,
     orig: { patient: "Donna Pierce", dob: "3/14/59", date: "5/2/25", drug: "metformin", strength: "500 mg", disp: "60", sig: "1 tab po BID with food", refills: "5", dawChecked: false },
     ans: { qtyAccept: ["60"], days: "30", refills: "5", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["twice", "2 times"], ["with food", "with meals", "with a meal"]],
     dirModel: "Take 1 tablet by mouth twice daily with food.",
-    note: "Carry the 'with food' instruction over — it reduces metformin's GI upset. 60 ÷ 2 = 30 days.",
+    note: "Carry the 'with food' instruction over — it reduces metformin's GI upset. 60 ÷ 2 = 30 days. Immediate-release, not ER — read the product line carefully.",
   },
   {
     level: 2, drug: "atorvastatin", strength: "40 mg", prescriber: "Lena Cho, MD", prescriberAddr: "44 Center Ave, Dayton, OH",
+    controlled: false, origin: "4", origins: "e-prescription",
+    ndcOptions: [{ t: "atorvastatin 40 mg", ndc: "00378-2074" }, { t: "atorvastatin 20 mg", ndc: "00378-2073" }, { t: "atorvastatin 80 mg", ndc: "00378-2075" }], ansNdc: 0,
+    prescriberOptions: ["Lena Cho, MD", "Lena Choi, MD", "Lana Cho, DO"], ansPresc: 0,
     orig: { patient: "Tyrone Banks", dob: "7/22/72", date: "3/30/25", drug: "atorvastatin", strength: "40 mg", disp: "90", sig: "1 tab po qHS", refills: "3", dawChecked: false },
     ans: { qtyAccept: ["90"], days: "90", refills: "3", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["bedtime"]],
@@ -3719,59 +3805,157 @@ const INTAKE = [
   },
   {
     level: 3, drug: "amoxicillin", strength: "250 mg/5 mL", prescriber: "Nadia Salem, MD", prescriberAddr: "501 Vine St, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "amoxicillin 250 mg/5 mL susp", ndc: "00093-4209" }, { t: "amoxicillin 400 mg/5 mL susp", ndc: "00093-4210" }, { t: "amoxicillin 500 mg cap", ndc: "00093-4155" }], ansNdc: 0,
+    prescriberOptions: ["Nadia Salem, MD", "Nadia Salomon, MD", "Nadja Salem, DO"], ansPresc: 0,
     orig: { patient: "Baby Cruz", dob: "1/5/24", date: "5/12/25", drug: "amoxicillin susp", strength: "250 mg/5 mL", disp: "150 mL", sig: "5 mL po TID x10d", refills: "0", dawChecked: false },
     ans: { qtyAccept: ["150", "150 ml", "150ml"], days: "10", refills: "0", daw: "0" },
     dirConcepts: [["5 ml"], ["by mouth", "oral"], ["three times", "3 times"], ["10 day", "ten day"]],
     dirModel: "Take 5 mL by mouth three times daily for 10 days.",
-    note: "Liquid days supply = total volume ÷ daily volume = 150 ÷ (5 × 3) = 10 days. Enter quantity in mL.",
+    note: "Liquid days supply = total volume ÷ daily volume = 150 ÷ (5 × 3) = 10 days. Enter quantity in mL, and pick the concentration the prescriber wrote.",
   },
   {
     level: 2, drug: "prednisone", strength: "10 mg", prescriber: "Owen Pratt, MD", prescriberAddr: "62 Spring St, Dayton, OH",
+    controlled: false, origin: "2", origins: "phoned in",
+    ndcOptions: [{ t: "prednisone 10 mg", ndc: "00054-4728" }, { t: "prednisone 20 mg", ndc: "00054-4742" }, { t: "prednisolone 10 mg", ndc: "00054-4199" }], ansNdc: 0,
+    prescriberOptions: ["Owen Pratt, MD", "Owen Platt, MD", "Owens Pratt, DO"], ansPresc: 0,
     orig: { patient: "Bianca Flores", dob: "9/30/86", date: "4/25/25", drug: "prednisone", strength: "10 mg", disp: "10", sig: "2 tabs po daily x5d", refills: "0", dawChecked: false },
     ans: { qtyAccept: ["10"], days: "5", refills: "0", daw: "0" },
     dirConcepts: [["2", "two"], ["by mouth", "oral"], ["once daily", "daily"], ["5 day", "five day"]],
     dirModel: "Take 2 tablets by mouth once daily for 5 days.",
-    note: "2 tabs/day × 5 days = 10 tablets, days supply 5. Watch the amount — it's 2 tablets, not 1.",
+    note: "2 tabs/day × 5 days = 10 tablets, days supply 5. Watch the amount — it's 2 tablets, not 1. This one was phoned in → origin 2.",
   },
   {
     level: 3, drug: "levothyroxine", strength: "100 mcg", prescriber: "David Mercer, MD", prescriberAddr: "12 Thyroid Way, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "levothyroxine 100 mcg", ndc: "00074-4552" }, { t: "levothyroxine 112 mcg", ndc: "00074-9296" }, { t: "levothyroxine 50 mcg", ndc: "00074-4341" }], ansNdc: 0,
+    prescriberOptions: ["David Mercer, MD", "David Merck, MD", "Daniel Mercer, DO"], ansPresc: 0,
     orig: { patient: "Grace Lindqvist", dob: "2/17/68", date: "5/1/25", drug: "levothyroxine (Synthroid)", strength: "100 mcg", disp: "90", sig: "1 tab po daily ac breakfast", refills: "3", dawChecked: true },
     ans: { qtyAccept: ["90"], days: "90", refills: "3", daw: "1" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"], ["before breakfast", "before meals", "empty stomach", "ac breakfast"]],
     dirModel: "Take 1 tablet by mouth once daily before breakfast.",
-    note: "The 'Dispense As Written' box is checked → DAW 1 (brand necessary). Carry the 'before breakfast' timing — it matters for absorption.",
+    note: "The 'Dispense As Written' box is checked → DAW 1 (brand necessary). Carry the 'before breakfast' timing — it matters for absorption. Strength look-alikes: 100 mcg, not 112.",
   },
   {
     level: 2, drug: "gabapentin", strength: "300 mg", prescriber: "Raj Patel, MD", prescriberAddr: "210 Care Dr, Dayton, OH",
+    controlled: false, origin: "4", origins: "e-prescription",
+    ndcOptions: [{ t: "gabapentin 300 mg cap", ndc: "00093-5028" }, { t: "gabapentin 100 mg cap", ndc: "00093-5026" }, { t: "gabapentin 600 mg tab", ndc: "00093-1093" }], ansNdc: 0,
+    prescriberOptions: ["Raj Patel, MD", "Raj Patil, MD", "Rajan Patel, DO"], ansPresc: 0,
     orig: { patient: "Helen Ortiz", dob: "4/28/52", date: "5/6/25", drug: "gabapentin", strength: "300 mg", disp: "90", sig: "1 cap po TID", refills: "5", dawChecked: false },
     ans: { qtyAccept: ["90"], days: "30", refills: "5", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["three times", "3 times"]],
     dirModel: "Take 1 capsule by mouth three times daily.",
-    note: "90 caps ÷ 3 per day = 30 days.",
+    note: "90 caps ÷ 3 per day = 30 days. Capsule, not the 600 mg tablet.",
   },
   {
     level: 3, drug: "omeprazole", strength: "20 mg", prescriber: "Iris Tan, MD", prescriberAddr: "9 Summit Ave, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "omeprazole 20 mg DR cap", ndc: "00378-5202" }, { t: "omeprazole 40 mg DR cap", ndc: "00378-5204" }, { t: "esomeprazole 20 mg cap", ndc: "00186-5020" }], ansNdc: 0,
+    prescriberOptions: ["Iris Tan, MD", "Iris Tang, MD", "Irene Tan, DO"], ansPresc: 0,
     orig: { patient: "Walter Munoz", dob: "1/14/61", date: "5/8/25", drug: "omeprazole", strength: "20 mg", disp: "30", sig: "1 cap po daily ac breakfast", refills: "2", dawChecked: false },
     ans: { qtyAccept: ["30"], days: "30", refills: "2", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"], ["before breakfast", "before meals", "empty stomach", "ac breakfast"]],
     dirModel: "Take 1 capsule by mouth once daily before breakfast.",
-    note: "PPIs work best taken 30–60 min before a meal — carry that over from the sig.",
+    note: "PPIs work best taken 30–60 min before a meal — carry that over from the sig. Omeprazole, not esomeprazole.",
   },
   {
     level: 4, drug: "warfarin", strength: "5 mg", prescriber: "Tara Wells, MD", prescriberAddr: "14 Bayview Ave, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "warfarin 5 mg", ndc: "00056-0176" }, { t: "warfarin 2.5 mg", ndc: "00056-0170" }, { t: "warfarin 10 mg", ndc: "00056-0174" }], ansNdc: 0,
+    prescriberOptions: ["Tara Wells, MD", "Tara Welles, MD", "Tanya Wells, DO"], ansPresc: 0,
     orig: { patient: "Derek Foss", dob: "5/19/83", date: "5/11/25", drug: "warfarin (Coumadin)", strength: "5 mg", disp: "30", sig: "1 tab po daily", refills: "3", dawChecked: true },
     ans: { qtyAccept: ["30"], days: "30", refills: "3", daw: "1" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"]],
     dirModel: "Take 1 tablet by mouth once daily.",
-    note: "DAW box is checked → DAW 1. Warfarin is narrow-therapeutic-index, so a brand request is clinically meaningful.",
+    note: "DAW box is checked → DAW 1. Warfarin is narrow-therapeutic-index, so a brand request is clinically meaningful — and the strength has to be exact.",
   },
   {
     level: 1, drug: "amlodipine", strength: "5 mg", prescriber: "Mona Adler, MD", prescriberAddr: "8 Clinic Ct, Dayton, OH",
+    controlled: false, origin: "4", origins: "e-prescription",
+    ndcOptions: [{ t: "amlodipine 5 mg", ndc: "00093-7156" }, { t: "amlodipine 10 mg", ndc: "00093-7157" }, { t: "amlodipine 2.5 mg", ndc: "00093-7155" }], ansNdc: 0,
+    prescriberOptions: ["Mona Adler, MD", "Mona Alder, MD", "Nora Adler, DO"], ansPresc: 0,
     orig: { patient: "Carl Whitman", dob: "12/11/70", date: "5/19/25", drug: "amlodipine", strength: "5 mg", disp: "30", sig: "1 tab po daily", refills: "5", dawChecked: false },
     ans: { qtyAccept: ["30"], days: "30", refills: "5", daw: "0" },
     dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"]],
     dirModel: "Take 1 tablet by mouth once daily.",
     note: "Straightforward maintenance entry — 30 once daily = 30 days, substitution permissible (DAW 0).",
+  },
+  {
+    level: 3, drug: "albuterol HFA", strength: "90 mcg", prescriber: "Tara Wells, MD", prescriberAddr: "14 Bayview Ave, Dayton, OH",
+    controlled: false, origin: "4", origins: "e-prescription",
+    ndcOptions: [{ t: "albuterol HFA 90 mcg inhaler", ndc: "00173-0682" }, { t: "albuterol 2.5 mg/3 mL neb", ndc: "00487-9501" }, { t: "levalbuterol HFA 45 mcg", ndc: "00075-2306" }], ansNdc: 0,
+    prescriberOptions: ["Tara Wells, MD", "Tara Welles, MD", "Tanya Wells, DO"], ansPresc: 0,
+    orig: { patient: "Derek Foss", dob: "5/19/83", date: "5/11/25", drug: "albuterol HFA", strength: "90 mcg (200 puffs)", disp: "1 inhaler", sig: "2 puffs inh BID prn SOB", refills: "2", dawChecked: false },
+    ans: { qtyAccept: ["1", "1 inhaler"], days: "50", refills: "2", daw: "0" },
+    dirConcepts: [["2", "two"], ["puff", "inhale"], ["twice", "2 times"], ["as needed", "prn"]],
+    dirModel: "Inhale 2 puffs by mouth twice daily as needed for shortness of breath.",
+    note: "Inhaler days supply = total puffs ÷ puffs per day = 200 ÷ (2 × 2) = 50 days. Bill the scheduled max even though it's PRN. Pick the HFA inhaler, not the nebulizer solution.",
+  },
+  {
+    level: 4, drug: "insulin glargine", strength: "100 units/mL", prescriber: "Iris Tan, MD", prescriberAddr: "9 Summit Ave, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "insulin glargine 100 u/mL (10 mL vial)", ndc: "00088-2220" }, { t: "insulin lispro 100 u/mL", ndc: "00002-7510" }, { t: "insulin glargine 100 u/mL pen", ndc: "00088-2219" }], ansNdc: 0,
+    prescriberOptions: ["Iris Tan, MD", "Iris Tang, MD", "Irene Tan, DO"], ansPresc: 0,
+    orig: { patient: "Walter Munoz", dob: "1/14/61", date: "5/8/25", drug: "insulin glargine", strength: "100 units/mL", disp: "1 vial (10 mL = 1000 units)", sig: "20 units subq qHS", refills: "5", dawChecked: false },
+    ans: { qtyAccept: ["10", "10 ml", "1 vial", "1000 units"], days: "50", refills: "5", daw: "0" },
+    dirConcepts: [["20"], ["unit", "units"], ["subcutaneous", "subq", "sub q"], ["bedtime", "night"]],
+    dirModel: "Inject 20 units subcutaneously at bedtime.",
+    note: "Insulin days supply = total units ÷ units per day = 1000 ÷ 20 = 50 days. A 10 mL vial holds 1000 units at U-100. Vial, not the pen.",
+  },
+  {
+    level: 3, drug: "latanoprost", strength: "0.005%", prescriber: "David Mercer, MD", prescriberAddr: "12 Vision Way, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "latanoprost 0.005% ophthalmic", ndc: "00023-3921" }, { t: "latanoprost 0.005% (2.5 mL)", ndc: "61314-0225" }, { t: "timolol 0.5% ophthalmic", ndc: "00378-0355" }], ansNdc: 0,
+    prescriberOptions: ["David Mercer, MD", "David Merck, MD", "Daniel Mercer, DO"], ansPresc: 0,
+    orig: { patient: "Grace Lindqvist", dob: "2/17/68", date: "5/1/25", drug: "latanoprost", strength: "0.005%", disp: "2.5 mL", sig: "1 gtt ou qHS", refills: "3", dawChecked: false },
+    ans: { qtyAccept: ["2.5", "2.5 ml"], days: "30", refills: "3", daw: "0" },
+    dirConcepts: [["1", "one"], ["drop"], ["both eyes", "ou"], ["bedtime", "night"]],
+    dirModel: "Instill 1 drop into both eyes at bedtime.",
+    note: "Eye drops ≈ 20 gtt/mL. 2.5 mL ≈ 50 drops; 1 gtt in each eye nightly = 2/day → ~25–30 days (plans usually allow 30).",
+  },
+  {
+    level: 4, drug: "triamcinolone", strength: "0.1% cream", prescriber: "Mona Adler, MD", prescriberAddr: "8 Clinic Ct, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "triamcinolone 0.1% cream 30 g", ndc: "00168-0004" }, { t: "triamcinolone 0.5% cream", ndc: "00168-0006" }, { t: "hydrocortisone 1% cream", ndc: "00168-0015" }], ansNdc: 0,
+    prescriberOptions: ["Mona Adler, MD", "Mona Alder, MD", "Nora Adler, DO"], ansPresc: 0,
+    orig: { patient: "Carl Whitman", dob: "12/11/70", date: "5/19/25", drug: "triamcinolone", strength: "0.1% cream", disp: "30 g", sig: "apply to aff area BID", refills: "2", dawChecked: false },
+    ans: { qtyAccept: ["30", "30 g", "30g"], days: "30", refills: "2", daw: "0" },
+    dirConcepts: [["apply"], ["affected area", "aff"], ["twice", "2 times"]],
+    dirModel: "Apply to the affected area twice daily.",
+    note: "Topical days supply is an estimate (a fingertip unit ≈ 0.5 g). A 30 g tube for a small BID area is commonly billed ~30 days. Strength matters: 0.1%, not 0.5%.",
+  },
+  {
+    level: 4, drug: "hydrocodone/APAP", strength: "5-325 mg", prescriber: "Alan Frost, MD", prescriberAddr: "19 Mercy Blvd, Dayton, OH",
+    controlled: true, schedule: "C-III", origin: "1", origins: "written", dea: "AF1234563",
+    ndcOptions: [{ t: "hydrocodone/APAP 5-325 mg", ndc: "00406-0125" }, { t: "hydrocodone/APAP 10-325 mg", ndc: "00406-0128" }, { t: "oxycodone/APAP 5-325 mg", ndc: "00406-0512" }], ansNdc: 0,
+    prescriberOptions: ["Alan Frost, MD", "Alan Forst, MD", "Alan Frost, DO"], ansPresc: 0,
+    orig: { patient: "Helen Ortiz", dob: "4/28/52", date: "5/6/25", drug: "hydrocodone/APAP", strength: "5-325 mg", disp: "40", sig: "1 tab po q6h prn pain", refills: "0", dawChecked: false, dea: "AF1234563" },
+    ans: { qtyAccept: ["40"], days: "10", refills: "0", daw: "0" },
+    dirConcepts: [["1", "one"], ["by mouth", "oral"], ["every 6 hours", "q6h"], ["as needed", "prn"]],
+    dirModel: "Take 1 tablet by mouth every 6 hours as needed for pain.",
+    note: "C-III opioid: verify the prescriber's DEA (checksum must validate), origin 1, and note the refill limit (≤5 in 6 months for C-III–V). Max use = 4/day → 40 tabs = 10 days.",
+  },
+  {
+    level: 4, drug: "alprazolam", strength: "0.5 mg", prescriber: "Greg Wynn, MD", prescriberAddr: "70 Park Pl, Dayton, OH",
+    controlled: true, schedule: "C-IV", origin: "3", origins: "faxed", dea: "BW9876523",
+    ndcOptions: [{ t: "alprazolam 0.5 mg", ndc: "00009-0029" }, { t: "alprazolam 1 mg", ndc: "00009-0090" }, { t: "lorazepam 0.5 mg", ndc: "00008-0081" }], ansNdc: 0,
+    prescriberOptions: ["Greg Wynn, MD", "Greg Winn, MD", "Gregg Wynn, DO"], ansPresc: 0,
+    orig: { patient: "Sofia Reyes", dob: "10/3/95", date: "5/15/25", drug: "alprazolam", strength: "0.5 mg", disp: "30", sig: "1 tab po TID prn anxiety", refills: "2", dawChecked: false, dea: "BW9876523" },
+    ans: { qtyAccept: ["30"], days: "10", refills: "2", daw: "0" },
+    dirConcepts: [["1", "one"], ["by mouth", "oral"], ["three times", "3 times"], ["as needed", "prn"]],
+    dirModel: "Take 1 tablet by mouth three times daily as needed for anxiety.",
+    note: "C-IV: DEA checksum must validate; this one was faxed → origin 3. Max 3/day → 30 tabs = 10 days.",
+  },
+  {
+    level: 3, drug: "levothyroxine", strength: "100 mcg", prescriber: "Raj Patel, MD", prescriberAddr: "210 Care Dr, Dayton, OH",
+    controlled: false, origin: "1", origins: "written",
+    ndcOptions: [{ t: "levothyroxine 100 mcg", ndc: "00074-4552" }, { t: "levothyroxine 112 mcg", ndc: "00074-9296" }, { t: "levothyroxine 50 mcg", ndc: "00074-4341" }], ansNdc: 0,
+    prescriberOptions: ["Raj Patel, MD", "Raj Patil, MD", "Rajan Patel, DO"], ansPresc: 0,
+    orig: { patient: "Grace Kim", dob: "6/4/71", date: "5/1/25", drug: "levothyroxine (Synthroid)", strength: "100 mcg", disp: "90", sig: "1 tab po daily ac breakfast", refills: "3", dawChecked: true },
+    ans: { qtyAccept: ["90"], days: "90", refills: "3", daw: "1" },
+    dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"], ["before breakfast", "before meals", "empty stomach", "ac breakfast"]],
+    dirModel: "Take 1 tablet by mouth once daily before breakfast.",
+    note: "DAW box checked → DAW 1 (brand). Carry the 'before breakfast' timing. 90 once daily = 90 days.",
   },
 ];
 
@@ -3838,6 +4022,15 @@ function makeManualIntakeCase(form, serial) {
     strength,
     prescriber,
     prescriberAddr: "Manual queue insert",
+    // a pharmacy-keyed insert has one product and one prescriber to pick from,
+    // and NCPDP origin 5 (pharmacy) by definition
+    controlled: false,
+    origin: "5",
+    origins: "pharmacy entry",
+    ndcOptions: [{ t: `${drug} ${strength}`, ndc: "—" }],
+    ansNdc: 0,
+    prescriberOptions: [prescriber],
+    ansPresc: 0,
     orig: { patient, dob, date: today, drug, strength, disp: qty, sig, refills, dawChecked: daw === "1" },
     ans: { qtyAccept: Array.from(new Set([qtyLower, qtyLower.replace(/\s+/g, "")])), days, refills, daw },
     dirConcepts: manualDirConcepts(sig),
@@ -3858,30 +4051,56 @@ function IntakeBench({ level, onFinish, onQuit }) {
   const [days, setDays] = useState("");
   const [refl, setRefl] = useState("");
   const [daw, setDaw] = useState(null);
+  const [ndc, setNdc] = useState(null);
+  const [presc, setPresc] = useState(null);
+  const [origin, setOrigin] = useState(null);
+  const [dea, setDea] = useState("");
   const [locked, setLocked] = useState(false);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [best, setBest] = useState(0);
   const [correct, setCorrect] = useState(0);
+  const dirRef = useRef(null);
 
   if (!queue.length) return <Empty onQuit={onQuit} />;
   const c = queue[0];
   const expanded = expandSig(dir);
+  const perDay = perDayFromSig(dir);
+  const qtyNum = parseFloat(qty);
+  const daysSuggest = perDay && qtyNum ? Math.floor(qtyNum / perDay) : null;
   const hand = { fontFamily: "'Caveat', cursive", color: "#2a2a33", lineHeight: 1.1 };
+
+  // autocomplete: shorthand suggestions for the last token typed
+  const lastTok = (dir.split(/\s/).pop() || "").toLowerCase();
+  const sugg = lastTok.length >= 1 ? SIG_CODES.filter(([code]) => code.startsWith(lastTok) && code !== lastTok).slice(0, 5) : [];
+  function applySugg(code) {
+    const parts = dir.split(/(\s+)/); // keep separators
+    for (let i = parts.length - 1; i >= 0; i--) { if (parts[i].trim()) { parts[i] = code; break; } }
+    setDir(parts.join("") + " ");
+    if (dirRef.current) dirRef.current.focus();
+  }
+
   const checks = locked ? {
     dir: dirOK(c.dirConcepts, dir),
     qty: c.ans.qtyAccept.includes(qty.trim().toLowerCase()),
     days: days.trim() === c.ans.days,
     refl: refl.trim() === c.ans.refills,
     daw: daw === c.ans.daw,
+    ndc: ndc === c.ansNdc,
+    presc: presc === c.ansPresc,
+    origin: origin === c.origin,
+    dea: !c.controlled || (dea.trim().toUpperCase() === c.dea && deaValid(dea)),
   } : null;
   const allOK = checks && Object.values(checks).every(Boolean);
-  const canSubmit = dir.trim() && qty.trim() && days.trim() && refl.trim() && daw != null;
+  const canSubmit = dir.trim() && qty.trim() && days.trim() && refl.trim() && daw != null
+    && ndc != null && presc != null && origin != null && (!c.controlled || dea.trim());
   const totalInPlay = completed + queue.length;
   const manualReady = manual.drug.trim() && manual.sig.trim() && manual.qty.trim() && manual.days.trim();
+  const deaState = c.controlled ? (dea.trim() ? (deaValid(dea) ? "valid" : "bad") : "empty") : null;
 
   function resetEntry() {
-    setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null); setLocked(false);
+    setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null);
+    setNdc(null); setPresc(null); setOrigin(null); setDea(""); setLocked(false);
   }
 
   function moveQueueItem(from, to) {
@@ -3914,8 +4133,10 @@ function IntakeBench({ level, onFinish, onQuit }) {
     if (locked || !canSubmit) return;
     setLocked(true);
     const ok = dirOK(c.dirConcepts, dir) && c.ans.qtyAccept.includes(qty.trim().toLowerCase())
-      && days.trim() === c.ans.days && refl.trim() === c.ans.refills && daw === c.ans.daw;
-    if (ok) { setScore((s) => s + 100 + streak * 25); const ns = streak + 1; setStreak(ns); setBest((b) => Math.max(b, ns)); setCorrect((x) => x + 1); }
+      && days.trim() === c.ans.days && refl.trim() === c.ans.refills && daw === c.ans.daw
+      && ndc === c.ansNdc && presc === c.ansPresc && origin === c.origin
+      && (!c.controlled || (dea.trim().toUpperCase() === c.dea && deaValid(dea)));
+    if (ok) { setScore((s) => s + 120 + streak * 30); const ns = streak + 1; setStreak(ns); setBest((b) => Math.max(b, ns)); setCorrect((x) => x + 1); }
     else setStreak(0);
   }
   function next() {
@@ -3932,11 +4153,37 @@ function IntakeBench({ level, onFinish, onQuit }) {
   const inp = (bad) => ({ padding: "10px 12px", borderRadius: 10, fontSize: 15, width: "100%", minWidth: 0,
     border: `1.5px solid ${locked ? (bad ? C.clay : C.green) : C.line}`, background: C.card, color: C.ink,
     fontFamily: "'Spline Sans', sans-serif", outline: "none" });
+  const lbl = (t) => <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>{t}</div>;
   const NumField = ({ label, val, set, bad, correctVal }) => (
     <div>
-      <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>{label}</div>
+      {lbl(label)}
       <input inputMode="numeric" value={val} disabled={locked} onChange={(e) => set(e.target.value)} style={inp(bad)} />
       {locked && bad && <div style={{ fontSize: 11.5, color: C.clay, marginTop: 3 }}>→ {correctVal}</div>}
+    </div>
+  );
+  // a select rendered as tap chips (works desktop + mobile)
+  const Choice = ({ label, options, sel, set, ansIdx }) => (
+    <div>
+      {lbl(label)}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {options.map((o, i) => {
+          const key = typeof o === "string" ? o : (o.v != null ? o.v : i);
+          const val = typeof o === "string" ? i : (o.v != null ? o.v : i);
+          let bg = "transparent", bd = C.line, col = C.ink;
+          if (sel === val && !locked) { bg = C.pine; bd = C.pine; col = C.paper; }
+          if (locked) {
+            if (val === ansIdx) { bg = "rgba(46,139,87,0.16)"; bd = C.green; }
+            else if (sel === val) { bg = "rgba(178,58,36,0.12)"; bd = C.clay; }
+          }
+          return (
+            <button key={key} disabled={locked} onClick={() => set(val)}
+              style={{ padding: "8px 11px", borderRadius: 9, border: `1.5px solid ${bd}`, background: bg, color: col,
+                cursor: locked ? "default" : "pointer", fontSize: 13, fontWeight: 500, fontFamily: "'Spline Sans',sans-serif", textAlign: "left" }}>
+              {typeof o === "string" ? o : o.t}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -3952,7 +4199,7 @@ function IntakeBench({ level, onFinish, onQuit }) {
       <ProgressBar value={(completed / Math.max(totalInPlay, 1)) * 100} />
 
       <p style={{ fontSize: 14, color: C.muted, margin: "14px 0 12px", lineHeight: 1.5 }}>
-        Read the hard copy and <strong style={{ color: C.ink }}>key the prescription in</strong> — type the sig (shorthand is fine), enter the quantity, work out the days supply, and set refills and DAW.
+        Read the hard copy and <strong style={{ color: C.ink }}>key the prescription in</strong> — pick the product and prescriber, type the sig (shorthand is fine), work out the days supply, and set refills, DAW, and the origin code. Controlled scripts need the prescriber's DEA number too.
       </p>
 
       <div className="rx-card" style={{ padding: 16, marginBottom: 14, background: "rgba(31,74,63,0.04)" }}>
@@ -4050,11 +4297,13 @@ function IntakeBench({ level, onFinish, onQuit }) {
         <div style={{ padding: "12px 16px 9px", textAlign: "center", borderBottom: "2px solid #2a2a33" }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#2a2a33" }}>{c.prescriber}</div>
           <div style={{ fontSize: 11.5, color: "#666" }}>{c.prescriberAddr}</div>
+          {c.controlled && <div className="mono" style={{ fontSize: 11, color: "#a33", marginTop: 3 }}>{c.schedule} · DEA {c.dea}</div>}
         </div>
         <div style={{ padding: "12px 16px 16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
             <div><div style={{ fontSize: 10.5, color: "#888" }}>Patient</div><div style={{ ...hand, fontSize: 19 }}>{c.orig.patient}</div><div style={{ ...hand, fontSize: 15 }}>{c.orig.dob}</div></div>
-            <div style={{ textAlign: "right" }}><div style={{ fontSize: 10.5, color: "#888" }}>Date</div><div style={{ ...hand, fontSize: 19 }}>{c.orig.date}</div></div>
+            <div style={{ textAlign: "right" }}><div style={{ fontSize: 10.5, color: "#888" }}>Date</div><div style={{ ...hand, fontSize: 19 }}>{c.orig.date}</div>
+              {c.origins && <div className="mono" style={{ fontSize: 9.5, color: "#999", marginTop: 4 }}>rec'd: {c.origins}</div>}</div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <div style={{ fontFamily: "'Fraunces',serif", fontSize: 32, fontWeight: 900, color: "#2a2a33", lineHeight: 0.9 }}>℞</div>
@@ -4074,13 +4323,34 @@ function IntakeBench({ level, onFinish, onQuit }) {
 
       {/* entry form */}
       <div className="rx-card" style={{ padding: 16 }}>
-        <div className="display" style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>New Rx — Data Entry</div>
-        <div className="mono" style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>{c.drug} {c.strength} <span style={{ color: C.green }}>· NDC selected</span></div>
+        <div className="display" style={{ fontSize: 16, fontWeight: 900, marginBottom: 14 }}>New Rx — Data Entry</div>
 
-        <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>Directions (sig)</div>
-        <input value={dir} disabled={locked} onChange={(e) => setDir(e.target.value)}
+        {/* product / NDC */}
+        <Choice label="Product (NDC)" sel={ndc} set={setNdc} ansIdx={c.ansNdc}
+          options={(c.ndcOptions || []).map((o) => ({ t: `${o.t} · ${o.ndc}` }))} />
+        {locked && checks && !checks.ndc && (
+          <div style={{ fontSize: 11.5, color: C.clay, marginTop: 3 }}>
+            → {c.ndcOptions[c.ansNdc].t} · {c.ndcOptions[c.ansNdc].ndc}
+          </div>
+        )}
+
+        <div style={{ marginTop: 14 }} />
+        {lbl("Directions (sig)")}
+        <input ref={dirRef} value={dir} disabled={locked} onChange={(e) => setDir(e.target.value)}
           placeholder="e.g. 1 tab po bid"
           style={{ ...inp(checks && !checks.dir), fontFamily: "'Spline Sans Mono', monospace" }} />
+        {/* shorthand autocomplete */}
+        {!locked && sugg.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+            {sugg.map(([code, meaning]) => (
+              <button key={code} onClick={() => applySugg(code)}
+                style={{ padding: "5px 9px", borderRadius: 8, border: `1px solid ${C.line}`, background: C.card, color: C.ink,
+                  cursor: "pointer", fontSize: 11.5, fontFamily: "'Spline Sans Mono', monospace" }}>
+                <strong>{code}</strong> <span style={{ color: C.muted }}>{meaning}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {/* live expander */}
         <div style={{ marginTop: 8, padding: "9px 12px", borderRadius: 10, background: "rgba(31,74,63,0.05)", border: `1px dashed ${C.line}`, minHeight: 38 }}>
           <span className="mono" style={{ fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: C.amber }}>System preview </span>
@@ -4092,11 +4362,53 @@ function IntakeBench({ level, onFinish, onQuit }) {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 14 }}>
+        <div className="de-row3" style={{ marginTop: 14 }}>
           <NumField label="Quantity" val={qty} set={setQty} bad={checks && !checks.qty} correctVal={c.ans.qtyAccept[0]} />
           <NumField label="Days supply" val={days} set={setDays} bad={checks && !checks.days} correctVal={c.ans.days} />
           <NumField label="Refills" val={refl} set={setRefl} bad={checks && !checks.refl} correctVal={c.ans.refills} />
         </div>
+        {!locked && daysSuggest != null && daysSuggest > 0 && (
+          <button onClick={() => setDays(String(daysSuggest))}
+            style={{ marginTop: 6, padding: "5px 10px", borderRadius: 8, border: `1px dashed ${C.amber}`, background: "rgba(192,120,30,0.08)",
+              color: C.amber, cursor: "pointer", fontSize: 11.5, fontFamily: "'Spline Sans Mono', monospace" }}>
+            system suggests {daysSuggest} days ({qtyNum} ÷ {Number(perDay.toFixed(2))}/day) — tap to fill
+          </button>
+        )}
+
+        {/* prescriber / origin / DEA */}
+        <div className="de-row2" style={{ marginTop: 14, alignItems: "start" }}>
+          <div>
+            <Choice label="Prescriber" sel={presc} set={setPresc} ansIdx={c.ansPresc} options={c.prescriberOptions || []} />
+            {locked && checks && !checks.presc && (
+              <div style={{ fontSize: 11.5, color: C.clay, marginTop: 3 }}>→ {c.prescriberOptions[c.ansPresc]}</div>
+            )}
+          </div>
+          <div>
+            <Choice label="Origin code" sel={origin} set={setOrigin} ansIdx={c.origin}
+              options={[
+                { v: "1", t: "1 · written" }, { v: "2", t: "2 · telephone" },
+                { v: "3", t: "3 · fax" }, { v: "4", t: "4 · electronic" }, { v: "5", t: "5 · pharmacy" },
+              ]} />
+            {locked && checks && !checks.origin && (
+              <div style={{ fontSize: 11.5, color: C.clay, marginTop: 3 }}>→ origin {c.origin} ({c.origins})</div>
+            )}
+          </div>
+        </div>
+
+        {c.controlled && (
+          <div style={{ marginTop: 14 }}>
+            {lbl(`Prescriber DEA — ${c.schedule}`)}
+            <input value={dea} disabled={locked} onChange={(e) => setDea(e.target.value)}
+              placeholder="2 letters + 7 digits"
+              style={{ ...inp(checks && !checks.dea), fontFamily: "'Spline Sans Mono', monospace", textTransform: "uppercase" }} />
+            {!locked && (
+              <div style={{ fontSize: 11.5, marginTop: 4, color: deaState === "valid" ? C.green : deaState === "bad" ? C.clay : C.muted }}>
+                {deaState === "valid" ? "✓ checksum valid" : deaState === "bad" ? "✗ checksum fails — re-read the hard copy" : "controlled script — the DEA number must check out"}
+              </div>
+            )}
+            {locked && checks && !checks.dea && <div style={{ fontSize: 11.5, color: C.clay, marginTop: 3 }}>→ {c.dea} (valid)</div>}
+          </div>
+        )}
 
         <div style={{ marginTop: 14 }}>
           <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>DAW code</div>
@@ -4486,6 +4798,248 @@ function FillCheck({ level, onFinish, onQuit }) {
             {idx + 1 >= cases.length ? "Finish set" : "Next fill →"}
           </button>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   FULL RUN  (Mode 16) — one script, start to finish
+   Key the entry, check the technician's fill, then make the
+   final clinical call on the same prescription.
+   ============================================================ */
+const FULLRUN = [
+  {
+    level: 1,
+    rx: { prescriber: "Mona Adler, MD", patient: "Carl Whitman", dob: "12/11/70", date: "5/19/25", drug: "amlodipine", strength: "5 mg", disp: "30", sig: "1 tab po daily", refills: "5", dawChecked: false },
+    p1: { dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"]], dirModel: "Take 1 tablet by mouth once daily.", qtyAccept: ["30"], days: "30", refills: "5", daw: "0" },
+    p2: { ref: { color: "#ffffff", shape: "round", imprint: "A 5" }, stockDrug: "amlodipine", stockStrength: "5 mg", count: "30", pill: { color: "#ffffff", shape: "round", imprint: "A 5" }, labelPatient: "Carl Whitman", labelDrug: "amlodipine 5 mg", labelSig: "take 1 tablet by mouth once daily", errorField: null, note: "Stock, count, pills, and label all match — good fill." },
+    p3: { prompt: "Profile check: no allergies, no interacting meds, dose appropriate for HTN. Your call?", options: ["Verify — no issues", "Clarify with prescriber", "Reject"], answer: 0, note: "Clean profile — verify and sell with a quick counseling point (may cause ankle swelling)." },
+  },
+  {
+    level: 2,
+    rx: { prescriber: "Priya Nair, MD", patient: "Marcus Hale", dob: "8/1/90", date: "5/20/25", drug: "amoxicillin", strength: "500 mg", disp: "30", sig: "1 cap po TID x10d", refills: "0", dawChecked: false },
+    p1: { dirConcepts: [["1", "one"], ["by mouth", "oral"], ["three times", "3 times"], ["10 day", "ten day"]], dirModel: "Take 1 capsule by mouth three times daily for 10 days.", qtyAccept: ["30"], days: "10", refills: "0", daw: "0" },
+    p2: { ref: { color: "#e0907a", shape: "capsule", imprint: "AMOX 500" }, stockDrug: "amoxicillin", stockStrength: "500 mg", count: "20", pill: { color: "#e0907a", shape: "capsule", imprint: "AMOX 500" }, labelPatient: "Marcus Hale", labelDrug: "amoxicillin 500 mg", labelSig: "take 1 capsule by mouth three times daily for 10 days", errorField: "count", note: "1 cap TID × 10 days = 30, but only 20 were counted. Short count — send it back." },
+    p3: { prompt: "Profile alert: patient has a documented PENICILLIN allergy (hives). This is amoxicillin. Your call?", options: ["Verify — no issues", "Reject / call prescriber", "Fill but warn patient"], answer: 1, note: "Amoxicillin is a penicillin — a documented penicillin allergy is a hard stop. Reject and contact the prescriber for an alternative." },
+  },
+  {
+    level: 3,
+    rx: { prescriber: "Sam Okafor, MD", patient: "Ethel Brooks", dob: "11/9/48", date: "4/18/25", drug: "lisinopril", strength: "10 mg", disp: "30", sig: "1 tab po daily", refills: "11", dawChecked: false },
+    p1: { dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"]], dirModel: "Take 1 tablet by mouth once daily.", qtyAccept: ["30"], days: "30", refills: "11", daw: "0" },
+    p2: { ref: { color: "#f3a6a6", shape: "round", imprint: "L 10" }, stockDrug: "lisinopril", stockStrength: "20 mg", count: "30", pill: { color: "#f7c873", shape: "round", imprint: "L 20" }, labelPatient: "Ethel Brooks", labelDrug: "lisinopril 10 mg", labelSig: "take 1 tablet by mouth once daily", errorField: "stock", note: "The order is 10 mg but the tech pulled the 20 mg stock (pills are the 20 mg tablet). Wrong strength — refill with 10 mg." },
+    p3: { prompt: "Profile shows the patient also fills spironolactone (K+-sparing). ACE inhibitor + K+-sparing raises hyperkalemia risk. Your call?", options: ["Verify — no issues", "Verify with a potassium-monitoring note / counsel", "Reject outright"], answer: 1, note: "It's a real but manageable interaction — verify, flag for potassium monitoring, and counsel. An outright reject isn't warranted if K+ is watched." },
+  },
+  {
+    level: 3,
+    rx: { prescriber: "Raj Patel, MD", patient: "Helen Ortiz", dob: "4/28/52", date: "5/6/25", drug: "warfarin", strength: "5 mg", disp: "30", sig: "1 tab po daily", refills: "3", dawChecked: false },
+    p1: { dirConcepts: [["1", "one"], ["by mouth", "oral"], ["once daily", "daily"]], dirModel: "Take 1 tablet by mouth once daily.", qtyAccept: ["30"], days: "30", refills: "3", daw: "0" },
+    p2: { ref: { color: "#f3a6c8", shape: "round", imprint: "WAR 5" }, stockDrug: "warfarin", stockStrength: "5 mg", count: "30", pill: { color: "#f3a6c8", shape: "round", imprint: "WAR 5" }, labelPatient: "Helen Ortiz", labelDrug: "warfarin 5 mg", labelSig: "take 1 tablet by mouth once daily", errorField: null, note: "Pink 5 mg matches the reference, count and label are right — good fill." },
+    p3: { prompt: "The patient is also picking up OTC ibuprofen today. Warfarin + NSAID = higher bleeding risk. Your call?", options: ["Verify silently", "Verify and counsel on bleeding / suggest acetaminophen", "Reject the warfarin"], answer: 1, note: "The warfarin is fine to dispense — the action is to counsel on the NSAID bleeding risk and suggest acetaminophen instead." },
+  },
+  {
+    level: 4,
+    rx: { prescriber: "Alan Frost, MD", patient: "Sofia Reyes", dob: "10/3/95", date: "5/15/25", drug: "lamotrigine", strength: "25 mg", disp: "60", sig: "1 tab po BID", refills: "2", dawChecked: false },
+    p1: { dirConcepts: [["1", "one"], ["by mouth", "oral"], ["twice", "2 times"]], dirModel: "Take 1 tablet by mouth twice daily.", qtyAccept: ["60"], days: "30", refills: "2", daw: "0" },
+    p2: { ref: { color: "#ffffff", shape: "round", imprint: "LA 25" }, stockDrug: "lamotrigine", stockStrength: "100 mg", count: "60", pill: { color: "#f7b0c2", shape: "round", imprint: "LA 100" }, labelPatient: "Sofia Reyes", labelDrug: "lamotrigine 25 mg", labelSig: "take 1 tablet by mouth twice daily", errorField: "stock", note: "Order is 25 mg; the tech pulled 100 mg (pink 100 pills). A 4× error on a drug that needs slow titration — reject." },
+    p3: { prompt: "New start of lamotrigine. Biggest counseling/safety point before it leaves?", options: ["Verify — nothing special", "Verify and counsel to report any rash immediately (SJS risk)", "Reject — lamotrigine can't be dispensed retail"], answer: 1, note: "Lamotrigine carries a serious-rash (Stevens-Johnson) warning — verify and counsel the patient to report any rash right away." },
+  },
+];
+
+function FullRun({ level, onFinish, onQuit }) {
+  const [cases] = useState(() => shuffle(FULLRUN.filter((c) => c.level <= level)).slice(0, 4));
+  const [ci, setCi] = useState(0);
+  const [phase, setPhase] = useState(1);
+  // phase 1 inputs
+  const [dir, setDir] = useState(""); const [qty, setQty] = useState(""); const [days, setDays] = useState("");
+  const [refl, setRefl] = useState(""); const [daw, setDaw] = useState(null);
+  const [p1lock, setP1lock] = useState(false);
+  const [p2pick, setP2pick] = useState(undefined); const [p2lock, setP2lock] = useState(false);
+  const [p3sel, setP3sel] = useState(null); const [p3lock, setP3lock] = useState(false);
+  const [score, setScore] = useState(0); const [correct, setCorrect] = useState(0);
+  const [streak, setStreak] = useState(0); const [best, setBest] = useState(0);
+
+  if (!cases.length) return <Empty onQuit={onQuit} />;
+  const c = cases[ci];
+  const hand = { fontFamily: "'Caveat', cursive", color: "#2a2a33", lineHeight: 1.1 };
+  const expanded = expandSig(dir);
+
+  function bump(ok) {
+    if (ok) { setScore((s) => s + 100 + streak * 20); const ns = streak + 1; setStreak(ns); setBest((b) => Math.max(b, ns)); setCorrect((x) => x + 1); }
+    else setStreak(0);
+  }
+  const p1canSubmit = dir.trim() && qty.trim() && days.trim() && refl.trim() && daw != null;
+  const p1checks = p1lock ? {
+    dir: dirOK(c.p1.dirConcepts, dir), qty: c.p1.qtyAccept.includes(qty.trim().toLowerCase()),
+    days: days.trim() === c.p1.days, refl: refl.trim() === c.p1.refills, daw: daw === c.p1.daw,
+  } : null;
+  const p1ok = p1checks && Object.values(p1checks).every(Boolean);
+
+  function submitP1() { if (p1lock || !p1canSubmit) return; setP1lock(true); bump(dirOK(c.p1.dirConcepts, dir) && c.p1.qtyAccept.includes(qty.trim().toLowerCase()) && days.trim() === c.p1.days && refl.trim() === c.p1.refills && daw === c.p1.daw); }
+  function chooseP2(k) { if (p2lock) return; setP2pick(k); setP2lock(true); bump(k === "__approve__" ? c.p2.errorField === null : k === c.p2.errorField); }
+  function chooseP3(i) { if (p3lock) return; setP3sel(i); setP3lock(true); bump(i === c.p3.answer); }
+
+  function nextCase() {
+    if (ci + 1 >= cases.length) { onFinish({ mode: 1, score, correct, total: cases.length * 3, bestStreak: best, outOfLives: false }); return; }
+    setCi(ci + 1); setPhase(1); setDir(""); setQty(""); setDays(""); setRefl(""); setDaw(null);
+    setP1lock(false); setP2pick(undefined); setP2lock(false); setP3sel(null); setP3lock(false);
+  }
+
+  const inp = (bad) => ({ padding: "9px 11px", borderRadius: 9, fontSize: 15, width: "100%", boxSizing: "border-box",
+    border: `1.5px solid ${p1lock ? (bad ? C.clay : C.green) : C.line}`, background: C.card, color: C.ink, fontFamily: "'Spline Sans', sans-serif", outline: "none" });
+  const P2FIELD = { stock: "stock bottle", count: "count", pill: "pills", label: "label" };
+
+  const Step = ({ n, label }) => {
+    const active = phase === n, done = phase > n;
+    return (
+      <div style={{ flex: 1, textAlign: "center" }}>
+        <div style={{ width: 26, height: 26, borderRadius: "50%", margin: "0 auto 4px", display: "grid", placeItems: "center",
+          background: done ? C.green : active ? C.pine : C.paper2, color: done || active ? C.paper : C.muted, fontSize: 12, fontWeight: 700 }}>{done ? "✓" : n}</div>
+        <div className="mono" style={{ fontSize: 8.5, letterSpacing: 0.5, textTransform: "uppercase", color: active ? C.pine : C.muted }}>{label}</div>
+      </div>
+    );
+  };
+
+  // compact hard copy
+  const HardCopy = () => (
+    <div className="rx-card" style={{ padding: 0, overflow: "hidden", background: "#fffdf7", marginBottom: 12 }}>
+      <div style={{ padding: "10px 14px 7px", textAlign: "center", borderBottom: "2px solid #2a2a33" }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: "#2a2a33" }}>{c.rx.prescriber}</div>
+      </div>
+      <div style={{ padding: "10px 14px 13px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+          <div><span style={{ fontSize: 10, color: "#888" }}>Patient </span><span style={{ ...hand, fontSize: 17 }}>{c.rx.patient} {c.rx.dob}</span></div>
+          <div style={{ ...hand, fontSize: 17 }}>{c.rx.date}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 26, fontWeight: 900, color: "#2a2a33", lineHeight: 0.9 }}>℞</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ ...hand, fontSize: 20 }}>{c.rx.drug} {c.rx.strength}</div>
+            <div><span style={{ fontSize: 12, color: "#666", fontWeight: 600 }}>Disp: </span><span style={{ ...hand, fontSize: 17 }}>{c.rx.disp}</span>
+              <span style={{ fontSize: 12, color: "#666", fontWeight: 600, marginLeft: 10 }}>Sig: </span><span style={{ ...hand, fontSize: 17 }}>{c.rx.sig}</span>
+              <span style={{ fontSize: 12, color: "#666", fontWeight: 600, marginLeft: 10 }}>Ref: </span><span style={{ ...hand, fontSize: 17 }}>{c.rx.refills}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="rise">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 16 }}>
+          <Stat label="Score" value={score} color={C.pine} />
+          <Stat label="Streak" value={`×${streak}`} color={C.amber} />
+        </div>
+        <span className="mono" style={{ fontSize: 12, color: C.muted }}>Script {ci + 1} / {cases.length}</span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginBottom: 16 }}>
+        <Step n={1} label="Enter" /><Step n={2} label="Fill check" /><Step n={3} label="Verify" />
+      </div>
+
+      <HardCopy />
+
+      {/* PHASE 1 — ENTER */}
+      {phase === 1 && (
+        <div className="rx-card" style={{ padding: 16 }}>
+          <div className="display" style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>1 · Key it in</div>
+          <div className="mono" style={{ fontSize: 10.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>Directions (sig)</div>
+          <input value={dir} disabled={p1lock} onChange={(e) => setDir(e.target.value)} placeholder="e.g. 1 tab po bid"
+            style={{ ...inp(p1checks && !p1checks.dir), fontFamily: "'Spline Sans Mono',monospace" }} />
+          <div style={{ marginTop: 6, padding: "7px 10px", borderRadius: 9, background: "rgba(31,74,63,0.05)", border: `1px dashed ${C.line}`, fontSize: 13, color: expanded ? C.ink : C.muted }}>
+            <span className="mono" style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.amber }}>preview </span>{expanded || "…"}
+          </div>
+          {p1lock && !p1checks.dir && <div style={{ fontSize: 11.5, color: C.clay, marginTop: 3 }}>→ {c.p1.dirModel}</div>}
+          <div className="de-row3" style={{ marginTop: 12 }}>
+            <div><div className="mono" style={{ fontSize: 10, textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Qty</div><input inputMode="numeric" value={qty} disabled={p1lock} onChange={(e) => setQty(e.target.value)} style={inp(p1checks && !p1checks.qty)} />{p1lock && !p1checks.qty && <div style={{ fontSize: 11, color: C.clay }}>→ {c.p1.qtyAccept[0]}</div>}</div>
+            <div><div className="mono" style={{ fontSize: 10, textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Days</div><input inputMode="numeric" value={days} disabled={p1lock} onChange={(e) => setDays(e.target.value)} style={inp(p1checks && !p1checks.days)} />{p1lock && !p1checks.days && <div style={{ fontSize: 11, color: C.clay }}>→ {c.p1.days}</div>}</div>
+            <div><div className="mono" style={{ fontSize: 10, textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Refills</div><input inputMode="numeric" value={refl} disabled={p1lock} onChange={(e) => setRefl(e.target.value)} style={inp(p1checks && !p1checks.refl)} />{p1lock && !p1checks.refl && <div style={{ fontSize: 11, color: C.clay }}>→ {c.p1.refills}</div>}</div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div className="mono" style={{ fontSize: 10, textTransform: "uppercase", color: C.muted, marginBottom: 5 }}>DAW</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[["0", "0"], ["1", "1·brand"], ["2", "2·pt"]].map(([v, t]) => {
+                let bg = "transparent", bd = C.line, col = C.ink;
+                if (daw === v && !p1lock) { bg = C.pine; bd = C.pine; col = C.paper; }
+                if (p1lock) { if (v === c.p1.daw) { bg = "rgba(46,139,87,0.16)"; bd = C.green; } else if (daw === v) { bg = "rgba(178,58,36,0.12)"; bd = C.clay; } }
+                return <button key={v} disabled={p1lock} onClick={() => setDaw(v)} style={{ flex: 1, padding: "8px 4px", borderRadius: 9, border: `1.5px solid ${bd}`, background: bg, color: col, cursor: p1lock ? "default" : "pointer", fontWeight: 600, fontSize: 12 }}>{t}</button>;
+              })}
+            </div>
+          </div>
+          {!p1lock ? (
+            <button onClick={submitP1} disabled={!p1canSubmit} style={btn(C.pine, C.paper, { width: "100%", marginTop: 14, opacity: p1canSubmit ? 1 : 0.4 })}>Submit entry</button>
+          ) : (
+            <>
+              <div className="pop" style={{ marginTop: 12, padding: "10px 13px", borderRadius: 11, background: p1ok ? "rgba(46,139,87,0.10)" : "rgba(192,120,30,0.10)", border: `1px solid ${p1ok ? C.green : C.amber}`, fontSize: 13.5, fontWeight: 600, color: p1ok ? C.green : C.amber }}>{p1ok ? "✓ Entered correctly" : "Some fields were off — see the corrections above."}</div>
+              <button onClick={() => setPhase(2)} style={btn(C.pine, C.paper, { width: "100%", marginTop: 10 })}>Send to fill →</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* PHASE 2 — FILL CHECK */}
+      {phase === 2 && (
+        <div className="rx-card" style={{ padding: 16 }}>
+          <div className="display" style={{ fontSize: 15, fontWeight: 900, marginBottom: 4 }}>2 · Check the tech's fill</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(31,74,63,0.04)", borderRadius: 10, padding: "8px 12px", margin: "8px 0 12px" }}>
+            <div style={{ fontSize: 13.5 }}><strong>{c.rx.drug} {c.rx.strength}</strong> · Qty {c.rx.disp}</div>
+            <div style={{ textAlign: "center" }}><Pill p={c.p2.ref} size={26} /><div className="mono" style={{ fontSize: 8, color: C.muted }}>REF</div></div>
+          </div>
+          {(() => {
+            const zone = (k, title, body) => {
+              const isErr = c.p2.errorField === k, picked = p2pick === k;
+              let bg = C.card, bd = C.line;
+              if (p2lock) { if (isErr) { bg = "rgba(192,120,30,0.16)"; bd = C.amber; } else if (picked) { bg = "rgba(178,58,36,0.12)"; bd = C.clay; } }
+              return <button disabled={p2lock} onClick={() => chooseP2(k)} className="opt" style={{ textAlign: "left", width: "100%", background: bg, border: `1.5px solid ${bd}`, borderRadius: 11, padding: "10px 12px", cursor: p2lock ? "default" : "pointer", marginBottom: 8 }}>
+                <div className="mono" style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>{title}</div>{body}</button>;
+            };
+            return (
+              <>
+                {zone("stock", "Stock pulled", <span style={{ fontSize: 14, fontWeight: 700 }}>{c.p2.stockDrug} {c.p2.stockStrength}</span>)}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ flex: 1 }}>{zone("count", "Counted", <span className="display" style={{ fontSize: 22, fontWeight: 900 }}>{c.p2.count}</span>)}</div>
+                  <div style={{ flex: 1 }}>{zone("pill", "Pills", <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Pill p={c.p2.pill} size={24} /><span className="mono" style={{ fontSize: 10, color: C.muted }}>{c.p2.pill.imprint}</span></span>)}</div>
+                </div>
+                {zone("label", "Label", <span style={{ fontSize: 13 }}><strong>{c.p2.labelPatient}</strong> · {c.p2.labelDrug}<br /><span style={{ color: C.muted }}>{c.p2.labelSig}</span></span>)}
+              </>
+            );
+          })()}
+          {!p2lock ? (
+            <button onClick={() => chooseP2("__approve__")} style={btn(C.green, "#fff", { width: "100%", marginTop: 6, background: C.green })}>✓ Approve fill</button>
+          ) : (
+            <>
+              <div className="pop" style={{ marginTop: 8, padding: "10px 13px", borderRadius: 11, background: (p2pick === "__approve__" ? c.p2.errorField === null : p2pick === c.p2.errorField) ? "rgba(46,139,87,0.10)" : "rgba(178,58,36,0.08)", border: `1px solid ${(p2pick === "__approve__" ? c.p2.errorField === null : p2pick === c.p2.errorField) ? C.green : C.clay}` }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 3, color: (p2pick === "__approve__" ? c.p2.errorField === null : p2pick === c.p2.errorField) ? C.green : C.clay }}>{(p2pick === "__approve__" ? c.p2.errorField === null : p2pick === c.p2.errorField) ? (c.p2.errorField === null ? "✓ Correctly approved" : `✓ Caught the ${P2FIELD[c.p2.errorField]}`) : (c.p2.errorField === null ? "✕ It was actually a good fill" : `✕ The problem was the ${P2FIELD[c.p2.errorField]}`)}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.5 }}>{c.p2.note}</div>
+              </div>
+              <button onClick={() => setPhase(3)} style={btn(C.pine, C.paper, { width: "100%", marginTop: 10 })}>Final verify →</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* PHASE 3 — VERIFY */}
+      {phase === 3 && (
+        <div className="rx-card" style={{ padding: 16 }}>
+          <div className="display" style={{ fontSize: 15, fontWeight: 900, marginBottom: 8 }}>3 · Final verification</div>
+          <p style={{ fontSize: 14.5, lineHeight: 1.5, margin: "0 0 12px" }}>{c.p3.prompt}</p>
+          <div style={{ display: "grid", gap: 8 }}>
+            {c.p3.options.map((o, i) => {
+              let bg = C.card, bd = C.line;
+              if (p3lock) { if (i === c.p3.answer) { bg = "rgba(46,139,87,0.16)"; bd = C.green; } else if (i === p3sel) { bg = "rgba(178,58,36,0.12)"; bd = C.clay; } }
+              return <button key={i} disabled={p3lock} onClick={() => chooseP3(i)} className="opt" style={{ textAlign: "left", background: bg, border: `1.5px solid ${bd}`, borderRadius: 11, padding: "11px 13px", cursor: p3lock ? "default" : "pointer", fontSize: 14.5 }}>{o}</button>;
+            })}
+          </div>
+          {p3lock && (
+            <>
+              <div className="pop" style={{ marginTop: 12, padding: "11px 13px", borderRadius: 11, background: p3sel === c.p3.answer ? "rgba(46,139,87,0.10)" : "rgba(178,58,36,0.08)", border: `1px solid ${p3sel === c.p3.answer ? C.green : C.clay}`, fontSize: 13.5, lineHeight: 1.5 }}>
+                <strong style={{ color: p3sel === c.p3.answer ? C.green : C.clay }}>{p3sel === c.p3.answer ? "✓ " : "✕ "}</strong>{c.p3.note}
+              </div>
+              <button onClick={nextCase} style={btn(C.pine, C.paper, { width: "100%", marginTop: 10 })}>{ci + 1 >= cases.length ? "Finish run" : "Next script →"}</button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -7247,6 +7801,17 @@ export default function App() {
         @media (max-width: 360px) {
           .rx-wrap { padding: 12px 11px 76px; }
         }
+        /* Data-entry / full-run field grids — single column on phones */
+        .de-grid { display:grid; grid-template-columns:1fr; gap:14px; align-items:start; }
+        .de-row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+        .de-row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        @media (max-width: 560px) {
+          .de-row2 { grid-template-columns:1fr; }
+        }
+        @media (min-width: 860px) {
+          .rx-wrap { max-width:1060px !important; }
+          .de-grid { grid-template-columns:1fr 1fr; gap:20px; }
+        }
       `}</style>
       <div className="crtv" /><div className="scan" />
       {splash && <SplashScreen leaving={splashLeaving} />}
@@ -7361,6 +7926,9 @@ export default function App() {
         {screen === "play" && mode === 15 && (
           <CalcMode level={level} onFinish={finish} onQuit={home} />
         )}
+        {screen === "play" && mode === 16 && (
+          <FullRun level={level} onFinish={finish} onQuit={home} />
+        )}
         {screen === "result" && (
           <Result result={result} onAgain={() => setScreen("setup")} onHome={home} />
         )}
@@ -7399,8 +7967,8 @@ function Header({ onHome, show, save }) {
 }
 
 /* ---------- Home helpers ---------- */
-const MODE_TIME_EST = { 1:5, 2:10, 3:10, 4:5, 5:10, 6:5, 7:10, 8:10, 9:20, 10:10, 11:10, 12:10, 13:20, 14:25 };
-const DRILL_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12];
+const MODE_TIME_EST = { 1:5, 2:10, 3:10, 4:5, 5:10, 6:5, 7:10, 8:10, 9:20, 10:10, 11:10, 12:10, 13:20, 14:25, 15:15, 16:15 };
+const DRILL_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 16];
 
 function getRecommended(save) {
   const lastPlayed = save?.lastPlayed || {};
@@ -7687,7 +8255,7 @@ function Home({ onPick, onReference, showRef, setShowRef, save, onAfterHours, on
       <div style={{ ...TM, color: "#4A8FA5", fontSize: 8, letterSpacing: 2.5, marginBottom: 10 }}>▸ ALL STATIONS</div>
 
       {[
-        { label: "PHARMACIST STATION", sub: "QT · QV1 · DUR · QV2", ids: [11, 10, 5, 12] },
+        { label: "PHARMACIST STATION", sub: "QT · QV1 · DUR · QV2 · Full Run", ids: [11, 10, 5, 12, 16] },
         { label: "TECH BENCH",          sub: "Fill · Label · Billing · Law", ids: [4, 6, 2, 7] },
         { label: "PATIENT WINDOW",      sub: "Counter · Counseling · Speed", ids: [3, 8, 1] },
         { label: "FULL SHIFT",          sub: "Floor · Queue · Career", ids: [9, 13] },
